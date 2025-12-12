@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Нейросеть-трейдер Pro + Мониторинг обучения</title>
+    <title>Нейросеть-трейдер Pro + Система мониторинга обучения</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link rel="stylesheet" href="css/styles.css">
@@ -25,7 +25,7 @@
         <!-- Шапка -->
         <div class="header">
             <h1>🧠 Нейросеть-трейдер Pro + Система мониторинга обучения</h1>
-            <p>LSTM нейросеть обучается в реальном времени. Инструменты для понимания и анализа её работы.</p>
+            <p>LSTM нейросеть обучается в реальном времени. Использует накопленный опыт для принятия решений.</p>
         </div>
 
         <!-- Статус бар -->
@@ -103,6 +103,13 @@
                         📊 Отчет обучения
                     </button>
                     
+                    <button id="forceSellBtn" class="btn" style="background: #ef4444;">
+                        🔻 Принудительный SELL
+                    </button>
+                    <button id="forceBuyBtn" class="btn" style="background: #10b981;">
+                        🔺 Принудительный BUY
+                    </button>
+                    
                     <button id="saveBtn" class="btn btn-secondary">
                         💾 Сохранить
                     </button>
@@ -126,6 +133,8 @@
                             <option value="ETHUSDT">ETH/USDT</option>
                             <option value="SOLUSDT">SOL/USDT</option>
                             <option value="ADAUSDT">ADA/USDT</option>
+                            <option value="DOGEUSDT">DOGE/USDT</option>
+                            <option value="DOTUSDT">DOT/USDT</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -135,6 +144,7 @@
                             <option value="5m">5 минут</option>
                             <option value="15m">15 минут</option>
                             <option value="1h">1 час</option>
+                            <option value="4h">4 часа</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -144,6 +154,16 @@
                     <div class="form-group">
                         <label>Размер окна обучения</label>
                         <input type="number" id="lookback" value="50" min="10" max="200" step="10">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Агрессивность рисков</label>
+                        <select id="riskLevel">
+                            <option value="0.5">Консервативная</option>
+                            <option value="1" selected>Нормальная</option>
+                            <option value="1.5">Агрессивная</option>
+                            <option value="2">Очень агрессивная</option>
+                        </select>
                     </div>
                     
                     <div class="progress-bar">
@@ -183,6 +203,19 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Память обучения -->
+                <div class="card" id="experiencePanel">
+                    <div class="card-title">
+                        <span>🧠</span> Память обучения
+                    </div>
+                    <div id="experienceStats">
+                        <!-- Заполнится динамически -->
+                        <div style="text-align: center; padding: 20px; color: #94a3b8;">
+                            Загрузка памяти обучения...
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Правая панель -->
@@ -211,7 +244,7 @@
                     </div>
                 </div>
 
-                <!-- Индикаторы -->
+                <!-- Индикаторы с пониманием -->
                 <div class="card">
                     <div class="card-title">
                         <span>🔍</span> Что анализирует нейросеть прямо сейчас
@@ -226,9 +259,25 @@
                             </tr>
                         </thead>
                         <tbody id="indicatorsBody">
-                            <tr><td colspan="4">Загрузка данных...</td></tr>
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">
+                                    Загрузка данных с Binance API...
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Паттерны обучения -->
+                <div class="card" id="patternsPanel">
+                    <div class="card-title">
+                        <span>🎯</span> Выученные паттерны
+                    </div>
+                    <div id="patternsList" style="max-height: 150px; overflow-y: auto;">
+                        <div style="text-align: center; padding: 15px; color: #94a3b8;">
+                            Паттерны будут появляться по мере обучения...
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Лог с пониманием -->
@@ -237,16 +286,21 @@
                         <div class="card-title" style="margin: 0;">
                             <span>📝</span> Лог решений + Понимание работы
                         </div>
-                        <button id="clearLogBtn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">
-                            Очистить
-                        </button>
+                        <div>
+                            <button id="exportLogBtn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-right: 10px;">
+                                Экспорт
+                            </button>
+                            <button id="clearLogBtn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                                Очистить
+                            </button>
+                        </div>
                     </div>
                     <div class="log-content" id="logContent">
                         <div class="log-entry">
                             <div class="log-time">--:--:--</div>
                             <div class="log-message log-info">
                                 <strong>Система готова к обучению</strong><br>
-                                Нейросеть будет анализировать рынок и учиться на своих ошибках
+                                Нейросеть будет анализировать рынок, учиться на своих ошибках и использовать накопленный опыт.
                             </div>
                         </div>
                     </div>
