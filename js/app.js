@@ -1,27 +1,27 @@
 // Основной цикл приложения
 async function mainLoop() {
-    console.log('mainLoop called, status:', state.status);
+    console.log('mainLoop вызван, статус:', state.status);
     
     if (state.status !== 'running') {
-        console.log('Not running, exiting mainLoop');
+        console.log('Не работает, выходим из mainLoop');
         return;
     }
 
     try {
-        const symbol = document.getElementById('symbolSelect').value;
-        const interval = document.getElementById('timeframeSelect').value;
+        const symbol = document.getElementById('symbolSelect').value || 'BTCUSDT';
+        const interval = document.getElementById('timeframeSelect').value || '5m';
 
-        console.log('Fetching new data...');
+        console.log('Загрузка новых данных...');
         // Загружаем данные
         const newData = await fetchData(symbol, interval, 10);
         
         if (!newData || newData.length === 0) {
-            console.log('No data received, retrying...');
+            console.log('Нет данных, повторная попытка...');
             setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
             return;
         }
 
-        console.log(`Received ${newData.length} new candles`);
+        console.log(`Получено новых свечей: ${newData.length}`);
         
         // Обновляем данные
         for (const candle of newData) {
@@ -49,7 +49,7 @@ async function mainLoop() {
 
         // Делаем прогноз
         if (state.priceData.length >= CONFIG.LOOKBACK) {
-            console.log('Making prediction...');
+            console.log('Делаем предсказание...');
             const prediction = await makePrediction();
 
             if (prediction) {
@@ -57,7 +57,7 @@ async function mainLoop() {
 
                 // Ждем следующую свечу для проверки
                 setTimeout(async () => {
-                    console.log('Checking prediction result...');
+                    console.log('Проверяем результат предсказания...');
                     const checkData = await fetchData(symbol, interval, 1);
                     if (checkData && checkData.length > 0) {
                         const actualPrice = checkData[0].close;
@@ -66,14 +66,14 @@ async function mainLoop() {
                         updateUI();
                         updateLearningMetrics();
                     } else {
-                        console.log('No check data available');
+                        console.log('Нет данных для проверки');
                     }
                 }, 5000);
             } else {
-                console.log('No prediction made');
+                console.log('Предсказание не сделано');
             }
         } else {
-            console.log(`Not enough data for prediction: ${state.priceData.length}/${CONFIG.LOOKBACK}`);
+            console.log(`Недостаточно данных для предсказания: ${state.priceData.length}/${CONFIG.LOOKBACK}`);
         }
 
         updateCharts();
@@ -81,7 +81,7 @@ async function mainLoop() {
         updateLearningMetrics();
 
         // Следующий цикл
-        console.log('Scheduling next loop...');
+        console.log('Планируем следующий цикл...');
         setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
 
     } catch (error) {
@@ -91,197 +91,45 @@ async function mainLoop() {
     }
 }
 
-// Генерация отчета обучения
-function generateLearningReport() {
-    const predictions = state.predictions;
-    const total = predictions.length;
-
-    if (total === 0) {
-        return "Нейросеть еще не сделала ни одного прогноза.";
-    }
-
-    const recent = predictions.slice(-20);
-    const recentAccuracy = recent.filter(p => p.result?.isCorrect).length / recent.length * 100;
-    const totalAccuracy = predictions.filter(p => p.result?.isCorrect).length / total * 100;
-
-    const buyPredictions = predictions.filter(p => p.decision === 'BUY');
-    const sellPredictions = predictions.filter(p => p.decision === 'SELL');
-    const buyAccuracy = buyPredictions.filter(p => p.result?.isCorrect).length / buyPredictions.length * 100 || 0;
-    const sellAccuracy = sellPredictions.filter(p => p.result?.isCorrect).length / sellPredictions.length * 100 || 0;
-
-    const confidenceCorrect = recent
-        .filter(p => p.result?.isCorrect)
-        .reduce((sum, p) => sum + p.probability, 0) / recent.filter(p => p.result?.isCorrect).length || 0;
-
-    const confidenceWrong = recent
-        .filter(p => p.result && !p.result.isCorrect)
-        .reduce((sum, p) => sum + p.probability, 0) / recent.filter(p => p.result && !p.result.isCorrect).length || 0;
-
-    const patternsFound = experienceDB.patterns.length;
-    const memoryUsed = experienceDB.memoryUsage > 0 ? ((experienceDB.memoryUsage / 1024).toFixed(1) + 'KB') : '0KB';
-
-    let analysis = "";
-
-    if (recentAccuracy > 60) {
-        analysis = "✅ Нейросеть эффективно обучается и выявляет рыночные закономерности";
-    } else if (recentAccuracy > 55) {
-        analysis = "⚠️ Нейросеть учится, но нужны дополнительные данные для стабильности";
-    } else if (recentAccuracy > 50) {
-        analysis = "🔍 Нейросеть находится в процессе обучения, точность чуть выше случайной";
-    } else {
-        analysis = "🎯 Нейросеть изучает рынок, пока не выявила четких закономерностей";
-    }
-
-    if (Math.abs(buyAccuracy - sellAccuracy) > 20) {
-        analysis += "\n📊 Нейросеть лучше работает с " + (buyAccuracy > sellAccuracy ? "BUY" : "SELL") + " сигналами";
-    }
-
-    if (confidenceCorrect > 0.7 && confidenceWrong < 0.5) {
-        analysis += "\n🧠 Нейросеть уверена в правильных решениях и сомневается в ошибках - хороший признак";
-    }
-
-    const report = `
-🧠 ПОЛНЫЙ ОТЧЕТ ОБ ОБУЧЕНИИ
-==============================
-
-📊 ОСНОВНЫЕ МЕТРИКИ:
-• Всего прогнозов: ${total}
-• Точность (все время): ${totalAccuracy.toFixed(1)}%
-• Точность (последние 20): ${recentAccuracy.toFixed(1)}%
-• Баланс: ${state.balance.toFixed(2)} USDT
-• Прибыль/убыток: ${(state.balance - CONFIG.INITIAL_BALANCE).toFixed(2)} USDT
-
-🎯 ДЕТАЛЬНАЯ СТАТИСТИКА:
-• Точность BUY: ${buyAccuracy.toFixed(1)}% (прогнозов: ${buyPredictions.length})
-• Точность SELL: ${sellAccuracy.toFixed(1)}% (прогнозов: ${sellPredictions.length})
-• Средняя уверенность (правильные): ${(confidenceCorrect * 100).toFixed(1)}%
-• Средняя уверенность (ошибки): ${(confidenceWrong * 100).toFixed(1)}%
-
-🧠 ПАМЯТЬ ОБУЧЕНИЯ:
-• Паттернов найдено: ${patternsFound}
-• Использовано памяти: ${memoryUsed}
-• Решений в памяти: ${experienceDB.decisions.length}
-
-🔍 АНАЛИЗ ОБУЧЕНИЯ:
-${analysis}
-
-📈 СТАТУС: ${state.learningMetrics.stage === 'pattern_recognition' ? 'РАСПОЗНАВАНИЕ ПАТТЕРНОВ' : 'АКТИВНОЕ ОБУЧЕНИЕ'}
-`;
-
-    return report;
-}
-
-// Анализ последнего решения
-function analyzeLastDecision() {
-    if (!state.lastPrediction) {
-        return "Нет данных о последнем решении";
-    }
-
-    const pred = state.lastPrediction;
-    const confidence = (pred.probability * 100).toFixed(1);
-
-    let analysis = "";
-
-    if (pred.probability > 0.7) {
-        analysis = "🧠 Нейросеть ВЫСОКО уверена в этом решении";
-    } else if (pred.probability > 0.6) {
-        analysis = "🤔 Нейросеть умеренно уверена";
-    } else {
-        analysis = "🎯 Нейросеть НЕУВЕРЕННА, решение на грани";
-    }
-
-    if (pred.experienceBased) {
-        analysis += "\n📚 Решение основано на предыдущем успешном опыте";
-    }
-
-    if (pred.forced) {
-        analysis += "\n⚠️ Это было ПРИНУДИТЕЛЬНОЕ решение пользователя";
-    }
-
-    if (pred.result) {
-        analysis += pred.result.isCorrect ? 
-            "\n✅ Прогноз был ПРАВИЛЬНЫМ - нейросеть запомнит этот успех" :
-            "\n❌ Прогноз был ОШИБОЧНЫМ - нейросеть скорректирует веса";
-    }
-
-    const marketContext = analyzeMarketContext();
-    const marketAnalysis = `
-Текущие рыночные условия:
-• Тренд: ${marketContext.trend}
-• Волатильность: ${marketContext.volatility}
-• RSI: ${marketContext.rsiExtreme}
-• Объем: ${marketContext.volume}
-    `;
-
-    return `
-🔍 ДЕТАЛЬНЫЙ АНАЛИЗ ПОСЛЕДНЕГО РЕШЕНИЯ
-======================================
-
-📊 РЕШЕНИЕ:
-• Тип: ${pred.decision} ${pred.forced ? '(ПРИНУДИТЕЛЬНО)' : ''}
-• Уверенность: ${confidence}%
-• Цена в момент решения: ${pred.price.toFixed(2)}
-${pred.result ? `• Реальная цена: ${pred.result.actualPrice.toFixed(2)}` : ''}
-${pred.result ? `• Изменение: ${pred.result.priceChangePercent}%` : ''}
-${pred.result ? `• Результат: ${pred.result.isCorrect ? '✅ ПРАВИЛЬНО' : '❌ ОШИБКА'}` : ''}
-
-🤔 КАК ПРИНИМАЛОСЬ РЕШЕНИЕ:
-1. Проанализировано ${CONFIG.LOOKBACK} свечей
-2. Уверенность модели: ${confidence}%
-3. Балансировка классов: ${pred.classBalanceCorrection ? 'применена' : 'не применялась'}
-4. Коррекция по рынку: ${pred.marketAdjustment ? pred.marketAdjustment.toFixed(3) : '0'}
-5. Порог принятия: ${pred.dynamicThreshold ? pred.dynamicThreshold.toFixed(3) : '0.5'}
-
-${marketAnalysis}
-
-${analysis}
-
-💡 ВЛИЯНИЕ НА ОБУЧЕНИЕ:
-${pred.result && pred.result.isCorrect ? 
-    '• Усиливаем веса для подобных ситуаций' :
-    '• Ослабляем веса, корректируем стратегию'}
-`;
-}
-
 // Обработчики событий
 function initEventHandlers() {
-    console.log('Initializing event handlers...');
+    console.log('Инициализация обработчиков событий...');
     
     // Старт
     document.getElementById('startBtn').addEventListener('click', async () => {
-        console.log('Start button clicked');
+        console.log('Кнопка Старт нажата');
         
         if (state.status === 'running') {
-            console.log('Already running');
+            console.log('Уже работает');
             return;
         }
 
         try {
-            console.log('Starting learning process...');
+            console.log('Начинаем процесс обучения...');
             addLog('Начинаем процесс обучения...', 'info');
             
             if (!model) {
-                console.log('Creating model...');
-                model = await createModel();
-                if (!model) {
-                    console.error('Failed to create model');
+                console.log('Создаем модель...');
+                const createdModel = await createModel();
+                if (!createdModel) {
+                    console.error('Не удалось создать модель');
                     addLog('Не удалось создать модель', 'error');
                     showNotification('Ошибка создания модели', 'error');
                     return;
                 }
-                console.log('Model created successfully');
+                console.log('Модель успешно создана');
             }
 
-            const symbol = document.getElementById('symbolSelect').value;
-            const interval = document.getElementById('timeframeSelect').value;
+            const symbol = document.getElementById('symbolSelect').value || 'BTCUSDT';
+            const interval = document.getElementById('timeframeSelect').value || '5m';
             
-            console.log(`Loading data for ${symbol} with interval ${interval}`);
+            console.log(`Загрузка данных для ${symbol} с интервалом ${interval}`);
             addLog(`Загрузка данных для ${symbol} (${interval})...`, 'info');
             
             const data = await fetchData(symbol, interval, 100);
 
             if (data && data.length > 0) {
-                console.log(`Loaded ${data.length} candles`);
+                console.log(`Загружено свечей: ${data.length}`);
                 state.priceData = calculateIndicators(data);
                 state.sessionStart = Date.now();
                 state.status = 'running';
@@ -293,15 +141,15 @@ function initEventHandlers() {
                        'Нейросеть начала анализировать рынок и учиться на своих решениях');
                 showNotification('Нейросеть начала обучение', 'info');
 
-                console.log('Starting main loop...');
+                console.log('Запускаем основной цикл...');
                 mainLoop();
             } else {
-                console.error('No data loaded');
+                console.error('Данные не загружены');
                 addLog('Не удалось загрузить данные', 'error');
                 showNotification('Ошибка загрузки данных', 'error');
             }
         } catch (error) {
-            console.error('Error starting learning:', error);
+            console.error('Ошибка при запуске обучения:', error);
             addLog('Ошибка при запуске обучения: ' + error.message, 'error');
             showNotification('Ошибка при запуске обучения', 'error');
         }
@@ -309,7 +157,7 @@ function initEventHandlers() {
 
     // Пауза
     document.getElementById('pauseBtn').addEventListener('click', () => {
-        console.log('Pause button clicked');
+        console.log('Кнопка Пауза нажата');
         
         if (state.status === 'running') {
             state.status = 'paused';
@@ -326,21 +174,21 @@ function initEventHandlers() {
 
     // Анализ последнего решения
     document.getElementById('analyzeDecisionBtn').addEventListener('click', () => {
-        console.log('Analyze button clicked');
+        console.log('Кнопка Анализ нажата');
         const analysis = analyzeLastDecision();
         addLog('🔍 Анализ последнего решения', 'debug', analysis);
     });
 
     // Отчет обучения
     document.getElementById('learningReportBtn').addEventListener('click', () => {
-        console.log('Learning report button clicked');
+        console.log('Кнопка Отчет нажата');
         const report = generateLearningReport();
         addLog('📊 Полный отчет об обучении', 'info', report);
     });
 
     // Принудительный SELL
     document.getElementById('forceSellBtn').addEventListener('click', () => {
-        console.log('Force SELL button clicked');
+        console.log('Кнопка Принудительный SELL нажата');
         
         if (state.status !== 'running') {
             showNotification('Сначала запустите обучение', 'warning');
@@ -371,8 +219,8 @@ function initEventHandlers() {
         
         // Ждем следующую свечу для проверки
         setTimeout(async () => {
-            const symbol = document.getElementById('symbolSelect').value;
-            const interval = document.getElementById('timeframeSelect').value;
+            const symbol = document.getElementById('symbolSelect').value || 'BTCUSDT';
+            const interval = document.getElementById('timeframeSelect').value || '5m';
             const checkData = await fetchData(symbol, interval, 1);
             if (checkData && checkData.length > 0) {
                 const actualPrice = checkData[0].close;
@@ -386,7 +234,7 @@ function initEventHandlers() {
 
     // Принудительный BUY
     document.getElementById('forceBuyBtn').addEventListener('click', () => {
-        console.log('Force BUY button clicked');
+        console.log('Кнопка Принудительный BUY нажата');
         
         if (state.status !== 'running') {
             showNotification('Сначала запустите обучение', 'warning');
@@ -417,8 +265,8 @@ function initEventHandlers() {
         
         // Ждем следующую свечу для проверки
         setTimeout(async () => {
-            const symbol = document.getElementById('symbolSelect').value;
-            const interval = document.getElementById('timeframeSelect').value;
+            const symbol = document.getElementById('symbolSelect').value || 'BTCUSDT';
+            const interval = document.getElementById('timeframeSelect').value || '5m';
             const checkData = await fetchData(symbol, interval, 1);
             if (checkData && checkData.length > 0) {
                 const actualPrice = checkData[0].close;
@@ -431,17 +279,32 @@ function initEventHandlers() {
     });
 
     // Сохранить
-    document.getElementById('saveBtn').addEventListener('click', saveModel);
+    document.getElementById('saveBtn').addEventListener('click', () => {
+        if (window.saveModel) {
+            saveModel();
+        } else {
+            showNotification('Функция сохранения не доступна', 'error');
+        }
+    });
 
     // Загрузить
-    document.getElementById('loadBtn').addEventListener('click', loadModel);
+    document.getElementById('loadBtn').addEventListener('click', () => {
+        if (window.loadModel) {
+            loadModel();
+        } else {
+            showNotification('Функция загрузки не доступна', 'error');
+        }
+    });
 
     // Сброс
     document.getElementById('resetBtn').addEventListener('click', () => {
-        console.log('Reset button clicked');
+        console.log('Кнопка Сброс нажата');
         
         if (confirm('ВНИМАНИЕ! Сбросить модель и все данные?\nВся память обучения будет потеряна.')) {
+            // Сбрасываем глобальные переменные
             model = null;
+            
+            // Восстанавливаем начальное состояние
             state = {
                 status: 'stopped',
                 balance: CONFIG.INITIAL_BALANCE,
@@ -462,26 +325,29 @@ function initEventHandlers() {
                 }
             };
 
-            // Сброс опыта
-            experienceDB = {
-                patterns: [],
-                marketConditions: [],
-                decisions: [],
-                learnedRules: [],
-                statistics: {
-                    totalDecisions: 0,
-                    successfulBuys: 0,
-                    failedBuys: 0,
-                    successfulSells: 0,
-                    failedSells: 0,
-                    accuracyByMarketCondition: {},
-                    bestParameters: {}
-                },
-                memoryUsage: 0,
-                lastAnalysis: null
-            };
+            // Сбрасываем опыт
+            if (window.experienceDB) {
+                window.experienceDB = {
+                    patterns: [],
+                    marketConditions: [],
+                    decisions: [],
+                    learnedRules: [],
+                    statistics: {
+                        totalDecisions: 0,
+                        successfulBuys: 0,
+                        failedBuys: 0,
+                        successfulSells: 0,
+                        failedSells: 0,
+                        accuracyByMarketCondition: {}
+                    },
+                    memoryUsage: 0
+                };
+                
+                localStorage.removeItem('neuro_trader_experience_v1');
+            }
 
-            persistExperience();
+            localStorage.removeItem('neuro_trader_lstm_model_v5');
+            localStorage.removeItem('neuro_trader_model_state');
 
             document.getElementById('startBtn').disabled = false;
             document.getElementById('pauseBtn').disabled = true;
@@ -491,7 +357,11 @@ function initEventHandlers() {
             updateCharts();
             updateIndicatorsTable();
             updateLearningMetrics();
-            visualizeExperienceUsage();
+            
+            if (typeof visualizeExperienceUsage === 'function') {
+                visualizeExperienceUsage();
+            }
+            
             if (typeof updatePatternsList === 'function') {
                 updatePatternsList();
             }
@@ -504,9 +374,12 @@ function initEventHandlers() {
 
     // Очистка лога
     document.getElementById('clearLogBtn').addEventListener('click', () => {
-        console.log('Clear log button clicked');
-        document.getElementById('logContent').innerHTML = '';
-        addLog('Лог очищен', 'info');
+        console.log('Кнопка Очистить лог нажата');
+        const logContent = document.getElementById('logContent');
+        if (logContent) {
+            logContent.innerHTML = '';
+            addLog('Лог очищен', 'info');
+        }
     });
 
     // Прокрутка вверх
@@ -523,14 +396,14 @@ function initEventHandlers() {
 
     // Изменение настроек
     document.getElementById('symbolSelect').addEventListener('change', () => {
-        console.log('Symbol changed');
+        console.log('Торговая пара изменена');
         if (state.status === 'running') {
             addLog('Изменена торговая пара', 'info', 'Нейросеть продолжит обучение с новыми данными');
         }
     });
 
     document.getElementById('timeframeSelect').addEventListener('change', () => {
-        console.log('Timeframe changed');
+        console.log('Таймфрейм изменен');
         if (state.status === 'running') {
             addLog('Изменен таймфрейм', 'info', 'Нейросеть адаптируется к новому интервалу');
         }
@@ -539,7 +412,7 @@ function initEventHandlers() {
 
 // Инициализация
 async function init() {
-    console.log('Initializing application...');
+    console.log('Инициализация приложения...');
     
     try {
         // Проверяем загрузку TensorFlow.js
@@ -547,13 +420,13 @@ async function init() {
             throw new Error('TensorFlow.js не загружен. Проверьте подключение к интернету.');
         }
         
-        console.log('TensorFlow.js loaded:', tf.version.tfjs);
+        console.log('TensorFlow.js загружен:', tf.version.tfjs);
 
         // Загружаем опыт
         if (typeof loadExperience === 'function') {
             loadExperience();
         } else {
-            console.error('loadExperience function not found!');
+            console.error('Функция loadExperience не найдена!');
         }
 
         // Инициализируем обработчики
@@ -561,9 +434,11 @@ async function init() {
         
         // Пытаемся загрузить модель
         try {
-            await loadModel();
+            if (typeof loadModel === 'function') {
+                await loadModel();
+            }
         } catch (modelError) {
-            console.warn('Model not loaded, will create new:', modelError);
+            console.warn('Модель не загружена, создадим новую:', modelError);
         }
 
         // Обновляем UI
@@ -601,12 +476,16 @@ window.addEventListener('DOMContentLoaded', init);
 
 // Глобальная обработка ошибок
 window.addEventListener('error', function(event) {
-    console.error('Global error:', event.error);
+    console.error('Глобальная ошибка:', event.error);
     addLog('Неожиданная ошибка: ' + event.error.message, 'error');
 });
 
 // Обработка промисов без catch
 window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled promise rejection:', event.reason);
+    console.error('Необработанное отклонение промиса:', event.reason);
     addLog('Необработанная ошибка промиса: ' + event.reason.message, 'error');
 });
+
+// Экспортируем основные функции
+window.mainLoop = mainLoop;
+window.init = init;
