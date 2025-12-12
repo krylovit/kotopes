@@ -5,6 +5,8 @@ const CONFIG = {
     LOOKBACK: 50,
     UPDATE_INTERVAL: 30000, // 30 секунд
     API_URL: 'https://api.binance.com/api/v3/klines',
+    SYMBOL: 'BTCUSDT',
+    INTERVAL: '5m',
     FEATURES: 8,
-    MODEL_KEY: 'neuro_trader_lstm_model_v4'
+    MODEL_KEY: 'neuro_trader_lstm_model_v5'
 };
