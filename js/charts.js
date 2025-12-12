@@ -139,4 +139,51 @@ function updateCharts() {
             charts.accuracy.update('none');
         }
     }
+
+    // График уверенности
+    if (state.confidenceHistory.length > 0) {
+        const confidenceCtx = document.getElementById('confidenceChart').getContext('2d');
+        const correct = state.confidenceHistory.filter(d => d.isCorrect).slice(-20);
+        const wrong = state.confidenceHistory.filter(d => !d.isCorrect).slice(-20);
+
+        if (!charts.confidence) {
+            charts.confidence = new Chart(confidenceCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Правильные', 'Ошибки'],
+                    datasets: [{
+                        label: 'Средняя уверенность',
+                        data: [
+                            correct.reduce((a, b) => a + b.confidence, 0) / correct.length || 0,
+                            wrong.reduce((a, b) => a + b.confidence, 0) / wrong.length || 0
+                        ],
+                        backgroundColor: ['#10b981', '#ef4444'],
+                        borderColor: ['#10b981', '#ef4444'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        } else {
+            charts.confidence.data.datasets[0].data = [
+                correct.reduce((a, b) => a + b.confidence, 0) / correct.length || 0,
+                wrong.reduce((a, b) => a + b.confidence, 0) / wrong.length || 0
+            ];
+            charts.confidence.update('none');
+        }
+    }
 }
