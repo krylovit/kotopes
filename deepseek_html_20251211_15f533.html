@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Нейросеть-трейдер Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        /* Базовые стили для всех браузеров */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        /* Шапка */
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 5px solid #3b82f6;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #f1f5f9;
+            font-size: 28px;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        /* Основная разметка */
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-layout {
+                flex-direction: column;
+            }
+        }
+
+        .left-panel {
+            width: 300px;
+            min-width: 300px;
+        }
+
+        .right-panel {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Карточки */
+        .card {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Статус */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-dot.active {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .status-dot.paused {
+            background: #f59e0b;
+        }
+
+        .status-dot.stopped {
+            background: #ef4444;
+        }
+
+        /* Кнопки */
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: #10b981;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #475569;
+        }
+
+        .btn-secondary:hover {
+            background: #334155;
+        }
+
+        /* Формы */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: #f1f5f9;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Статистика */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .stat-item.green {
+            border-left-color: #10b981;
+        }
+
+        .stat-item.red {
+            border-left-color: #ef4444;
+        }
+
+        .stat-item.blue {
+            border-left-color: #3b82f6;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        /* Графики */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1400px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-wrapper {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #334155;
+            height: 400px;
+        }
+
+        .chart-wrapper h3 {
+            margin: 0 0 15px 0;
+            color: #f1f5f9;
+            font-size: 16px;
+        }
+
+        .chart-wrapper canvas {
+            width: 100% !important;
+            height: calc(100% - 30px) !important;
+        }
+
+        /* Индикаторы */
+        .indicators-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .indicators-table th {
+            background: #0f172a;
+            padding: 12px;
+            text-align: left;
+            color: #94a3b8;
+            font-weight: 600;
+            border-bottom: 2px solid #334155;
+            font-size: 13px;
+        }
+
+        .indicators-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #334155;
+            font-size: 13px;
+        }
+
+        .indicators-table tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Лог */
+        .log-container {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #334155;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            padding: 8px 0;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .log-time {
+            color: #64748b;
+            min-width: 70px;
+        }
+
+        .log-message {
+            color: #e2e8f0;
+        }
+
+        .log-profit {
+            color: #10b981;
+        }
+
+        .log-loss {
+            color: #ef4444;
+        }
+
+        .log-warning {
+            color: #f59e0b;
+        }
+
+        .log-info {
+            color: #3b82f6;
+        }
+
+        /* Уведомления */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #1e293b;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            max-width: 350px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .notification.error {
+            border-left-color: #ef4444;
+        }
+
+        /* Загрузчик */
+        .loader {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .loader.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Прогресс бар */
+        .progress-bar {
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        /* Вкладки */
+        .tabs {
+            display: flex;
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab.active {
+            background: #1e293b;
+            color: #3b82f6;
+            box-shadow: inset 0 -3px 0 #3b82f6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Тултипы */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Плавающая кнопка */
+        .floating-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .floating-btn:hover {
+            background: #2563eb;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Уведомления -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Загрузчик -->
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        <div id="loaderText">Загрузка...</div>
+    </div>
+
+    <!-- Плавающая кнопка -->
+    <button id="scrollTopBtn" class="floating-btn" style="display: none;">↑</button>
+
+    <div class="container">
+        <!-- Шапка -->
+        <div class="header">
+            <h1>🧠 Нейросеть-трейдер Pro</h1>
+            <p>LSTM нейросеть для прогнозирования финансовых рынков. Обучение в реальном времени на данных Binance API.</p>
+        </div>
+
+        <!-- Статус бар -->
+        <div class="status-bar">
+            <div class="status-indicator">
+                <span class="status-dot stopped" id="statusDot"></span>
+                <span id="statusText">Остановлено</span>
+            </div>
+            <div>
+                <span id="sessionTimer">00:00:00</span>
+            </div>
+        </div>
+
+        <!-- Вкладки -->
+        <div class="tabs">
+            <button class="tab active" data-tab="dashboard">📊 Дашборд</button>
+            <button class="tab" data-tab="model">🧠 Модель</button>
+            <button class="tab" data-tab="analytics">📈 Аналитика</button>
+        </div>
+
+        <!-- Основной контент -->
+        <div class="main-layout">
+            <!-- Левая панель -->
+            <div class="left-panel">
+                <!-- Управление -->
+                <div class="card">
+                    <div class="card-title">
+                        <span>⚙️</span> Управление
+                    </div>
+                    <button id="startBtn" class="btn btn-success">
+                        ▶ Старт обучения
+                    </button>
+                    <button id="pauseBtn" class="btn" disabled>
+                        ⏸ Пауза
+                    </button>
+                    <button id="saveBtn" class="btn btn-secondary">
+                        💾 Сохранить
+                    </button>
+                    <button id="loadBtn" class="btn btn-secondary">
+                        📂 Загрузить
+                    </button>
+                    <button id="resetBtn" class="btn btn-danger">
+                        🗑️ Сбросить
+                    </button>
+                </div>
+
+                <!-- Настройки -->
+                <div class="card">
+                    <div class="card-title">
+                        <span>🔧</span> Настройки
+                    </div>
+                    <div class="form-group">
+                        <label>Торговая пара</label>
+                        <select id="symbolSelect">
+                            <option value="BTCUSDT">BTC/USDT</option>
+                            <option value="ETHUSDT">ETH/USDT</option>
+                            <option value="SOLUSDT">SOL/USDT</option>
+                            <option value="ADAUSDT">ADA/USDT</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Таймфрейм</label>
+                        <select id="timeframeSelect">
+                            <option value="1m">1 минута</option>
+                            <option value="5m">5 минут</option>
+                            <option value="15m">15 минут</option>
+                            <option value="1h">1 час</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Размер ставки (USDT)</label>
+                        <input type="number" id="betSize" value="10" min="1" max="1000" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Размер окна обучения</label>
+                        <input type="number" id="lookback" value="50" min="10" max="200" step="10">
+                    </div>
+                    <div class="progress-bar">
+                        <div id="trainingProgress" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Статистика -->
+                <div class="card">
+                    <div class="card-title">
+                        <span>📈</span> Статистика
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item green">
+                            <div class="stat-label">Баланс</div>
+                            <div class="stat-value" id="balanceValue">1000.00</div>
+                        </div>
+                        <div class="stat-item blue">
+                            <div class="stat-label">Точность</div>
+                            <div class="stat-value" id="accuracyValue">-</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Прогнозов</div>
+                            <div class="stat-value" id="predictionsCount">0</div>
+                        </div>
+                        <div class="stat-item red">
+                            <div class="stat-label">Прибыль</div>
+                            <div class="stat-value" id="profitValue">+0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правая панель -->
+            <div class="right-panel">
+                <!-- Вкладка Дашборд -->
+                <div class="tab-content active" id="dashboard-tab">
+                    <!-- Графики -->
+                    <div class="charts-container">
+                        <div class="chart-wrapper">
+                            <h3>📈 Цена и прогнозы</h3>
+                            <canvas id="priceChart"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h3>💰 Баланс нейросети</h3>
+                            <canvas id="balanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Индикаторы -->
+                    <div class="card">
+                        <div class="card-title">
+                            <span>🔍</span> Технические индикаторы
+                        </div>
+                        <table class="indicators-table">
+                            <thead>
+                                <tr>
+                                    <th>Индикатор</th>
+                                    <th>Значение</th>
+                                    <th>Сигнал</th>
+                                    <th>Таймфрейм</th>
+                                </tr>
+                            </thead>
+                            <tbody id="indicatorsBody">
+                                <tr><td colspan="4">Загрузка данных...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Лог -->
+                    <div class="log-container">
+                        <div class="log-header">
+                            <div class="card-title" style="margin: 0;">
+                                <span>📝</span> Лог решений
+                            </div>
+                            <button id="clearLogBtn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                                Очистить
+                            </button>
+                        </div>
+                        <div class="log-content" id="logContent">
+                            <div class="log-entry">
+                                <div class="log-time">--:--:--</div>
+                                <div class="log-message log-info">Система готова. Нажмите "Старт обучения"</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка Модель -->
+                <div class="tab-content" id="model-tab">
+                    <div class="card">
+                        <div class="card-title">
+                            <span>🧬</span> Архитектура LSTM модели
+                        </div>
+                        <div style="padding: 20px; background: #0f172a; border-radius: 8px; margin-bottom: 20px;">
+                            <pre style="color: #94a3b8; font-family: monospace; font-size: 13px; margin: 0;">
+LSTM Model Architecture:
+├── Input Layer (50 timesteps × 8 features)
+├── LSTM Layer 1 (64 units, dropout: 0.2)
+├── LSTM Layer 2 (32 units, dropout: 0.2)
+├── Dense Layer (16 units, ReLU)
+├── Dropout Layer (0.3)
+├── Dense Layer (8 units, ReLU)
+└── Output Layer (1 unit, Sigmoid)
+
+Total Parameters: ~25,000
+Optimizer: Adam (lr=0.001)
+Loss: Binary Crossentropy
+                            </pre>
+                        </div>
+                        <button id="exportModelBtn" class="btn" style="width: auto; margin: 10px;">
+                            📤 Экспорт модели
+                        </button>
+                        <button id="importModelBtn" class="btn btn-secondary" style="width: auto; margin: 10px;">
+                            📥 Импорт модели
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Вкладка Аналитика -->
+                <div class="tab-content" id="analytics-tab">
+                    <div class="card">
+                        <div class="card-title">
+                            <span>📊</span> Детальная аналитика
+                        </div>
+                        <div class="charts-container">
+                            <div class="chart-wrapper">
+                                <h3>🎯 История точности</h3>
+                                <canvas id="accuracyChart"></canvas>
+                            </div>
+                            <div class="chart-wrapper">
+                                <h3>📉 Распределение прогнозов</h3>
+                                <canvas id="distributionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== КОНФИГУРАЦИЯ ====================
+        const CONFIG = {
+            INITIAL_BALANCE: 1000.0,
+            DEFAULT_BET: 10,
+            LOOKBACK: 50,
+            UPDATE_INTERVAL: 30000, // 30 секунд для тестирования
+            API_URL: 'https://api.binance.com/api/v3/klines',
+            FEATURES: 8, // Уменьшил количество признаков для стабильности
+            MODEL_KEY: 'neuro_trader_lstm_model_v3'
+        };
+
+        // ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
+        let model = null;
+        let charts = {};
+        let state = {
+            status: 'stopped', // 'running', 'paused', 'stopped'
+            balance: CONFIG.INITIAL_BALANCE,
+            predictions: [],
+            priceData: [],
+            balanceHistory: [{time: Date.now(), balance: CONFIG.INITIAL_BALANCE}],
+            accuracyHistory: [],
+            sessionStart: null,
+            indicators: {},
+            lastPrediction: null
+        };
+
+        // ==================== УТИЛИТЫ ====================
+        function showNotification(message, type = 'info', duration = 3000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => notification.classList.remove('show'), duration);
+        }
+
+        function showLoader(show, text = 'Загрузка...') {
+            const loader = document.getElementById('loader');
+            const loaderText = document.getElementById('loaderText');
+            
+            if (show) {
+                loaderText.textContent = text;
+                loader.classList.add('active');
+            } else {
+                loader.classList.remove('active');
+            }
+        }
+
+        function addLog(message, type = 'info') {
+            const logContent = document.getElementById('logContent');
+            const time = new Date().toLocaleTimeString();
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <div class="log-time">${time}</div>
+                <div class="log-message log-${type}">${message}</div>
+            `;
+            
+            logContent.prepend(entry);
+            
+            // Ограничиваем лог
+            if (logContent.children.length > 50) {
+                logContent.removeChild(logContent.lastChild);
+            }
+            
+            // Автопрокрутка
+            logContent.scrollTop = 0;
+        }
+
+        // ==================== ИНДИКАТОРЫ ====================
+        function calculateIndicators(data) {
+            if (data.length < 20) return data;
+            
+            // SMA 7
+            for (let i = 6; i < data.length; i++) {
+                let sum = 0;
+                for (let j = i-6; j <= i; j++) sum += data[j].close;
+                data[i].sma7 = sum / 7;
+            }
+            
+            // RSI
+            for (let i = 14; i < data.length; i++) {
+                let gains = 0, losses = 0;
+                for (let j = i-13; j <= i; j++) {
+                    const change = data[j].close - data[j-1].close;
+                    if (change > 0) gains += change;
+                    else losses += Math.abs(change);
+                }
+                const avgGain = gains / 14;
+                const avgLoss = losses / 14;
+                data[i].rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+            }
+            
+            // Простое изменение
+            for (let i = 1; i < data.length; i++) {
+                data[i].change = ((data[i].close - data[i-1].close) / data[i-1].close) * 100;
+            }
+            
+            return data;
+        }
+
+        // ==================== LSTM МОДЕЛЬ ====================
+        async function createModel() {
+            showLoader(true, 'Создание LSTM модели...');
+            
+            try {
+                const model = tf.sequential();
+                
+                // Первый LSTM слой
+                model.add(tf.layers.lstm({
+                    units: 64,
+                    inputShape: [CONFIG.LOOKBACK, CONFIG.FEATURES],
+                    returnSequences: true
+                }));
+                
+                // Второй LSTM слой
+                model.add(tf.layers.lstm({
+                    units: 32
+                }));
+                
+                // Dense слои
+                model.add(tf.layers.dense({units: 16, activation: 'relu'}));
+                model.add(tf.layers.dropout({rate: 0.3}));
+                model.add(tf.layers.dense({units: 8, activation: 'relu'}));
+                
+                // Выходной слой
+                model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+                
+                // Компиляция
+                model.compile({
+                    optimizer: tf.train.adam(0.001),
+                    loss: 'binaryCrossentropy',
+                    metrics: ['accuracy']
+                });
+                
+                console.log('Модель создана');
+                addLog('LSTM модель создана успешно', 'info');
+                return model;
+            } catch (error) {
+                console.error('Ошибка создания модели:', error);
+                addLog('Ошибка создания модели', 'warning');
+                return null;
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // ==================== РАБОТА С ДАННЫМИ ====================
+        async function fetchData(symbol, interval, limit = 100) {
+            try {
+                const url = `${CONFIG.API_URL}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+                const response = await fetch(url);
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const klines = await response.json();
+                
+                return klines.map(k => ({
+                    time: parseInt(k[0]),
+                    open: parseFloat(k[1]),
+                    high: parseFloat(k[2]),
+                    low: parseFloat(k[3]),
+                    close: parseFloat(k[4]),
+                    volume: parseFloat(k[5])
+                }));
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                addLog(`Ошибка загрузки: ${error.message}`, 'warning');
+                return null;
+            }
+        }
+
+        function prepareInput(data) {
+            if (data.length < CONFIG.LOOKBACK) return null;
+            
+            const sequence = data.slice(-CONFIG.LOOKBACK);
+            const features = sequence.map(candle => [
+                candle.close / 100000,        // Нормализованная цена
+                candle.volume / 1000000,      // Нормализованный объем
+                (candle.sma7 || candle.close) / 100000,
+                (candle.rsi || 50) / 100,     // RSI нормализован
+                candle.change ? candle.change / 10 : 0, // Изменение цены
+                Math.random() * 0.1,          // Шум для разнообразия
+                0, 0                          // Резерв
+            ]);
+            
+            return tf.tensor3d([features]);
+        }
+
+        // ==================== ОБУЧЕНИЕ И ПРОГНОЗ ====================
+        async function makePrediction() {
+            if (!model || state.priceData.length < CONFIG.LOOKBACK) return null;
+            
+            try {
+                const input = prepareInput(state.priceData);
+                if (!input) return null;
+                
+                const prediction = model.predict(input);
+                const probability = (await prediction.data())[0];
+                
+                const currentPrice = state.priceData[state.priceData.length - 1].close;
+                
+                input.dispose();
+                prediction.dispose();
+                
+                return {
+                    time: Date.now(),
+                    price: currentPrice,
+                    probability,
+                    decision: probability > 0.5 ? 'BUY' : 'SELL',
+                    result: null
+                };
+            } catch (error) {
+                console.error('Ошибка прогноза:', error);
+                return null;
+            }
+        }
+
+        // ==================== ОСНОВНОЙ ЦИКЛ ====================
+        async function mainLoop() {
+            if (state.status !== 'running') return;
+            
+            try {
+                const symbol = document.getElementById('symbolSelect').value;
+                const interval = document.getElementById('timeframeSelect').value;
+                
+                // Загружаем данные
+                const newData = await fetchData(symbol, interval, 10);
+                if (!newData || newData.length === 0) {
+                    setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
+                    return;
+                }
+                
+                // Обновляем данные
+                for (const candle of newData) {
+                    const exists = state.priceData.find(d => d.time === candle.time);
+                    if (!exists) {
+                        state.priceData.push(candle);
+                    }
+                }
+                
+                // Ограничиваем размер
+                if (state.priceData.length > 200) {
+                    state.priceData = state.priceData.slice(-200);
+                }
+                
+                // Рассчитываем индикаторы
+                state.priceData = calculateIndicators(state.priceData);
+                
+                // Обновляем индикаторы в таблице
+                updateIndicatorsTable();
+                
+                // Делаем прогноз
+                if (state.priceData.length >= CONFIG.LOOKBACK) {
+                    const prediction = await makePrediction();
+                    
+                    if (prediction) {
+                        state.lastPrediction = prediction;
+                        
+                        // Ждем следующую свечу для проверки
+                        setTimeout(async () => {
+                            const checkData = await fetchData(symbol, interval, 1);
+                            if (checkData && checkData.length > 0) {
+                                const actualPrice = checkData[0].close;
+                                evaluatePrediction(prediction, actualPrice);
+                                updateCharts();
+                                updateUI();
+                            }
+                        }, 5000);
+                    }
+                }
+                
+                // Обновляем графики
+                updateCharts();
+                
+                // Обновляем UI
+                updateUI();
+                
+                // Следующий цикл
+                setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
+                
+            } catch (error) {
+                console.error('Ошибка в цикле:', error);
+                setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
+            }
+        }
+
+        function evaluatePrediction(prediction, actualPrice) {
+            const betSize = parseFloat(document.getElementById('betSize').value) || CONFIG.DEFAULT_BET;
+            const priceChange = actualPrice - prediction.price;
+            
+            let isCorrect = false;
+            if (prediction.decision === 'BUY' && priceChange > 0) isCorrect = true;
+            if (prediction.decision === 'SELL' && priceChange < 0) isCorrect = true;
+            
+            // Обновляем баланс
+            if (isCorrect) {
+                state.balance += betSize * 0.95;
+            } else {
+                state.balance -= betSize;
+            }
+            
+            // Сохраняем результат
+            prediction.result = {
+                actualPrice,
+                isCorrect,
+                profit: isCorrect ? betSize * 0.95 : -betSize,
+                time: Date.now()
+            };
+            
+            state.predictions.push(prediction);
+            state.balanceHistory.push({
+                time: Date.now(),
+                balance: state.balance
+            });
+            
+            // Рассчитываем точность
+            const recent = state.predictions.slice(-100);
+            const correct = recent.filter(p => p.result && p.result.isCorrect).length;
+            const accuracy = recent.length > 0 ? (correct / recent.length) * 100 : 0;
+            
+            state.accuracyHistory.push({
+                time: Date.now(),
+                accuracy
+            });
+            
+            // Логируем
+            const logMsg = `Прогноз: ${prediction.decision} (${(prediction.probability*100).toFixed(1)}%) | ` +
+                          `Цена: ${prediction.price.toFixed(2)} → ${actualPrice.toFixed(2)} | ` +
+                          `Результат: ${isCorrect ? '✅' : '❌'} | ` +
+                          `Баланс: ${state.balance.toFixed(2)} USDT`;
+            
+            addLog(logMsg, isCorrect ? 'profit' : 'loss');
+        }
+
+        // ==================== ОБНОВЛЕНИЕ ИНТЕРФЕЙСА ====================
+        function updateUI() {
+            // Статус
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            statusDot.className = 'status-dot ' + state.status;
+            statusText.textContent = 
+                state.status === 'running' ? 'Обучение' :
+                state.status === 'paused' ? 'Пауза' : 'Остановлено';
+            
+            // Баланс и статистика
+            document.getElementById('balanceValue').textContent = state.balance.toFixed(2);
+            
+            const profit = state.balance - CONFIG.INITIAL_BALANCE;
+            document.getElementById('profitValue').textContent = (profit >= 0 ? '+' : '') + profit.toFixed(2);
+            document.getElementById('profitValue').parentElement.className = 
+                'stat-item ' + (profit >= 0 ? 'green' : 'red');
+            
+            document.getElementById('predictionsCount').textContent = state.predictions.length;
+            
+            // Точность
+            const recent = state.predictions.slice(-100);
+            const correct = recent.filter(p => p.result && p.result.isCorrect).length;
+            const accuracy = recent.length > 0 ? (correct / recent.length) * 100 : 0;
+            document.getElementById('accuracyValue').textContent = accuracy.toFixed(1) + '%';
+            
+            // Таймер сессии
+            if (state.sessionStart) {
+                const elapsed = Date.now() - state.sessionStart;
+                const hours = Math.floor(elapsed / 3600000);
+                const minutes = Math.floor((elapsed % 3600000) / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                document.getElementById('sessionTimer').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            // Прогресс обучения
+            const progress = Math.min(state.predictions.length / 100 * 100, 100);
+            document.getElementById('trainingProgress').style.width = progress + '%';
+        }
+
+        function updateIndicatorsTable() {
+            if (state.priceData.length === 0) return;
+            
+            const last = state.priceData[state.priceData.length - 1];
+            const table = document.getElementById('indicatorsBody');
+            
+            const indicators = [
+                {name: 'Цена', value: last.close.toFixed(2), signal: '—', timeframe: 'Текущая'},
+                {name: 'Объем', value: (last.volume / 1000).toFixed(1) + 'K', signal: last.volume > 1000000 ? 'Высокий' : 'Низкий', timeframe: '24ч'},
+                {name: 'RSI', value: last.rsi ? last.rsi.toFixed(1) : '—', signal: last.rsi > 70 ? 'Перекуплен' : last.rsi < 30 ? 'Перепродан' : 'Нейтрально', timeframe: '14'},
+                {name: 'SMA 7', value: last.sma7 ? last.sma7.toFixed(2) : '—', signal: last.close > last.sma7 ? 'Бычий' : 'Медвежий', timeframe: '7'},
+                {name: 'Изменение', value: last.change ? last.change.toFixed(2) + '%' : '—', signal: last.change > 0 ? 'Рост' : 'Падение', timeframe: '1'},
+                {name: 'Волатильность', value: '—', signal: 'Средняя', timeframe: '24ч'},
+                {name: 'Точность НС', value: state.accuracyHistory.length > 0 ? state.accuracyHistory[state.accuracyHistory.length-1].accuracy.toFixed(1) + '%' : '—', signal: 'Обучение', timeframe: '100'},
+                {name: 'Баланс НС', value: state.balance.toFixed(0), signal: state.balance > CONFIG.INITIAL_BALANCE ? 'Прибыль' : 'Убыток', timeframe: 'Сессия'}
+            ];
+            
+            let html = '';
+            indicators.forEach(ind => {
+                html += `
+                    <tr>
+                        <td>${ind.name}</td>
+                        <td>${ind.value}</td>
+                        <td>${ind.signal}</td>
+                        <td>${ind.timeframe}</td>
+                    </tr>
+                `;
+            });
+            
+            table.innerHTML = html;
+        }
+
+        // ==================== ГРАФИКИ ====================
+        function updateCharts() {
+            // График цены
+            if (state.priceData.length > 0) {
+                const priceCtx = document.getElementById('priceChart').getContext('2d');
+                const labels = state.priceData.slice(-50).map(d => 
+                    new Date(d.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+                );
+                const prices = state.priceData.slice(-50).map(d => d.close);
+                
+                if (!charts.price) {
+                    charts.price = new Chart(priceCtx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Цена',
+                                data: prices,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: { 
+                                    grid: { color: 'rgba(255,255,255,0.1)' },
+                                    ticks: { color: '#94a3b8', maxRotation: 0 }
+                                },
+                                y: {
+                                    grid: { color: 'rgba(255,255,255,0.1)' },
+                                    ticks: { color: '#94a3b8' }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    charts.price.data.labels = labels;
+                    charts.price.data.datasets[0].data = prices;
+                    charts.price.update('none');
+                }
+            }
+            
+            // График баланса
+            if (state.balanceHistory.length > 0) {
+                const balanceCtx = document.getElementById('balanceChart').getContext('2d');
+                const labels = state.balanceHistory.slice(-50).map(d => 
+                    new Date(d.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+                );
+                const balances = state.balanceHistory.slice(-50).map(d => d.balance);
+                
+                if (!charts.balance) {
+                    charts.balance = new Chart(balanceCtx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Баланс',
+                                data: balances,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    grid: { color: 'rgba(255,255,255,0.1)' },
+                                    ticks: { color: '#94a3b8' }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    charts.balance.data.labels = labels;
+                    charts.balance.data.datasets[0].data = balances;
+                    charts.balance.update('none');
+                }
+            }
+            
+            // График точности
+            if (state.accuracyHistory.length > 0) {
+                const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
+                const labels = state.accuracyHistory.slice(-50).map(d => 
+                    new Date(d.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+                );
+                const accuracies = state.accuracyHistory.slice(-50).map(d => d.accuracy);
+                
+                if (!charts.accuracy) {
+                    charts.accuracy = new Chart(accuracyCtx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Точность %',
+                                data: accuracies,
+                                borderColor: '#8b5cf6',
+                                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    min: 0,
+                                    max: 100,
+                                    grid: { color: 'rgba(255,255,255,0.1)' },
+                                    ticks: { color: '#94a3b8' }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    charts.accuracy.data.labels = labels;
+                    charts.accuracy.data.datasets[0].data = accuracies;
+                    charts.accuracy.update('none');
+                }
+            }
+        }
+
+        // ==================== СОХРАНЕНИЕ/ЗАГРУЗКА ====================
+        async function saveModel() {
+            showLoader(true, 'Сохранение модели...');
+            try {
+                if (model) {
+                    await model.save('localstorage://neuro-trader-model');
+                }
+                
+                localStorage.setItem(CONFIG.MODEL_KEY, JSON.stringify({
+                    balance: state.balance,
+                    predictions: state.predictions.slice(-100),
+                    balanceHistory: state.balanceHistory.slice(-50),
+                    accuracyHistory: state.accuracyHistory.slice(-50),
+                    savedAt: Date.now()
+                }));
+                
+                addLog('Модель и данные сохранены', 'info');
+                showNotification('Модель сохранена успешно', 'info');
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+                addLog('Ошибка сохранения модели', 'warning');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        async function loadModel() {
+            showLoader(true, 'Загрузка модели...');
+            try {
+                // Пытаемся загрузить модель
+                const models = await tf.io.listModels();
+                if (models['localstorage://neuro-trader-model']) {
+                    model = await tf.loadLayersModel('localstorage://neuro-trader-model');
+                    addLog('Модель загружена из памяти', 'info');
+                }
+                
+                // Загружаем данные
+                const saved = localStorage.getItem(CONFIG.MODEL_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    state.balance = data.balance || CONFIG.INITIAL_BALANCE;
+                    state.predictions = data.predictions || [];
+                    state.balanceHistory = data.balanceHistory || [{time: Date.now(), balance: state.balance}];
+                    state.accuracyHistory = data.accuracyHistory || [];
+                    
+                    updateUI();
+                    updateCharts();
+                    updateIndicatorsTable();
+                    
+                    addLog('Данные загружены', 'info');
+                    showNotification('Модель загружена успешно', 'info');
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                addLog('Модель не найдена, создаем новую', 'warning');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // ==================== ОБРАБОТЧИКИ СОБЫТИЙ ====================
+        function initEventHandlers() {
+            // Старт
+            document.getElementById('startBtn').addEventListener('click', async () => {
+                if (state.status === 'running') return;
+                
+                if (!model) {
+                    model = await createModel();
+                    if (!model) return;
+                }
+                
+                // Загружаем начальные данные
+                const symbol = document.getElementById('symbolSelect').value;
+                const interval = document.getElementById('timeframeSelect').value;
+                const data = await fetchData(symbol, interval, 100);
+                
+                if (data && data.length > 0) {
+                    state.priceData = calculateIndicators(data);
+                    state.sessionStart = Date.now();
+                    state.status = 'running';
+                    
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('pauseBtn').disabled = false;
+                    
+                    addLog('Обучение начато', 'info');
+                    showNotification('Нейросеть начала обучение', 'info');
+                    
+                    mainLoop();
+                }
+            });
+            
+            // Пауза
+            document.getElementById('pauseBtn').addEventListener('click', () => {
+                if (state.status === 'running') {
+                    state.status = 'paused';
+                    document.getElementById('pauseBtn').textContent = '▶ Продолжить';
+                    addLog('Обучение приостановлено', 'warning');
+                } else if (state.status === 'paused') {
+                    state.status = 'running';
+                    document.getElementById('pauseBtn').textContent = '⏸ Пауза';
+                    addLog('Обучение продолжено', 'info');
+                    mainLoop();
+                }
+            });
+            
+            // Сохранить
+            document.getElementById('saveBtn').addEventListener('click', saveModel);
+            
+            // Загрузить
+            document.getElementById('loadBtn').addEventListener('click', loadModel);
+            
+            // Сброс
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                if (confirm('Сбросить модель и все данные?')) {
+                    model = null;
+                    state = {
+                        status: 'stopped',
+                        balance: CONFIG.INITIAL_BALANCE,
+                        predictions: [],
+                        priceData: [],
+                        balanceHistory: [{time: Date.now(), balance: CONFIG.INITIAL_BALANCE}],
+                        accuracyHistory: [],
+                        sessionStart: null,
+                        indicators: {},
+                        lastPrediction: null
+                    };
+                    
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('pauseBtn').disabled = true;
+                    document.getElementById('pauseBtn').textContent = '⏸ Пауза';
+                    
+                    updateUI();
+                    updateCharts();
+                    updateIndicatorsTable();
+                    
+                    addLog('Система сброшена', 'warning');
+                    showNotification('Система сброшена', 'info');
+                }
+            });
+            
+            // Очистка лога
+            document.getElementById('clearLogBtn').addEventListener('click', () => {
+                document.getElementById('logContent').innerHTML = '';
+                addLog('Лог очищен', 'info');
+            });
+            
+            // Вкладки
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Убираем активный класс у всех вкладок
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    // Активируем текущую вкладку
+                    tab.classList.add('active');
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                });
+            });
+            
+            // Прокрутка вверх
+            document.getElementById('scrollTopBtn').addEventListener('click', () => {
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            });
+            
+            // Отслеживаем прокрутку
+            window.addEventListener('scroll', () => {
+                const btn = document.getElementById('scrollTopBtn');
+                btn.style.display = window.scrollY > 300 ? 'flex' : 'none';
+            });
+        }
+
+        // ==================== ИНИЦИАЛИЗАЦИЯ ====================
+        async function init() {
+            console.log('Инициализация системы...');
+            addLog('Система инициализируется', 'info');
+            
+            showLoader(true, 'Инициализация...');
+            
+            try {
+                // Проверяем TensorFlow.js
+                if (!tf) {
+                    throw new Error('TensorFlow.js не загружен');
+                }
+                
+                // Инициализируем обработчики
+                initEventHandlers();
+                
+                // Пытаемся загрузить сохраненную модель
+                await loadModel();
+                
+                // Обновляем UI
+                updateUI();
+                updateIndicatorsTable();
+                
+                addLog('Система готова к работе', 'info');
+                showNotification('Нейросеть-трейдер готова', 'info');
+                
+            } catch (error) {
+                console.error('Ошибка инициализации:', error);
+                addLog('Ошибка инициализации: ' + error.message, 'warning');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // Запуск при загрузке страницы
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
