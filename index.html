@@ -359,20 +359,6 @@ Features: Цена, Объем, RSI, SMA7, Изменение, Волатиль�
 5. Стабилизация (точность > 60%)
                             </pre>
                         </div>
-                        <div class="card-title">
-                            <span>⚙️</span> Управление моделью
-                        </div>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button id="exportModelBtn" class="btn" style="flex: 1; min-width: 150px;">
-                                📤 Экспорт модели
-                            </button>
-                            <button id="importModelBtn" class="btn btn-secondary" style="flex: 1; min-width: 150px;">
-                                📥 Импорт модели
-                            </button>
-                            <button id="testModelBtn" class="btn btn-purple" style="flex: 1; min-width: 150px;">
-                                🧪 Тест модели
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -408,20 +394,24 @@ Features: Цена, Объем, RSI, SMA7, Изменение, Волатиль�
         </div>
     </div>
 
-    <!-- Загружаем скрипты в правильном порядке -->
+    <!-- Загружаем скрипты в ПРАВИЛЬНОМ порядке -->
     <script src="js/config.js"></script>
     <script src="js/state.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/indicators.js"></script>
+    <script src="js/experience.js"></script>
     <script src="js/model.js"></script>
     <script src="js/data.js"></script>
     <script src="js/charts.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/learning.js"></script>
     <script src="js/app.js"></script>
     
     <script>
-        // Инициализация вкладок
+        // Простая инициализация вкладок
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Документ загружен, инициализируем вкладки...');
+            
             const tabs = document.querySelectorAll('.tab');
             const tabContents = document.querySelectorAll('.tab-content');
             
@@ -441,94 +431,10 @@ Features: Цена, Объем, RSI, SMA7, Изменение, Волатиль�
                 });
             });
             
-            // Кнопка экспорта модели
-            document.getElementById('exportModelBtn')?.addEventListener('click', async () => {
-                const model = window.model;
-                if (!model) {
-                    showNotification('Модель не создана', 'error');
-                    return;
-                }
-                
-                try {
-                    showLoader(true, 'Экспорт модели...');
-                    const saveResult = await model.save('downloads://neuro-trader-model');
-                    addLog('Модель экспортирована', 'info');
-                    showNotification('Модель успешно экспортирована', 'info');
-                } catch (error) {
-                    console.error('Ошибка экспорта:', error);
-                    addLog('Ошибка экспорта модели', 'error');
-                    showNotification('Ошибка экспорта модели', 'error');
-                } finally {
-                    showLoader(false);
-                }
-            });
-            
-            // Кнопка импорта модели
-            document.getElementById('importModelBtn')?.addEventListener('click', async () => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.json,application/json';
-                
-                input.onchange = async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    
-                    try {
-                        showLoader(true, 'Импорт модели...');
-                        const text = await file.text();
-                        const modelJson = JSON.parse(text);
-                        
-                        // Здесь должна быть логика загрузки модели
-                        // Для упрощения просто сохраняем в localStorage
-                        localStorage.setItem('imported_model', text);
-                        
-                        addLog('Модель импортирована из файла', 'info');
-                        showNotification('Модель импортирована успешно', 'info');
-                    } catch (error) {
-                        console.error('Ошибка импорта:', error);
-                        addLog('Ошибка импорта модели', 'error');
-                        showNotification('Ошибка импорта модели', 'error');
-                    } finally {
-                        showLoader(false);
-                    }
-                };
-                
-                input.click();
-            });
-            
-            // Кнопка теста модели
-            document.getElementById('testModelBtn')?.addEventListener('click', () => {
-                if (!window.model) {
-                    showNotification('Сначала создайте или загрузите модель', 'warning');
-                    return;
-                }
-                
-                addLog('🧪 Тестирование модели...', 'info', 'Проверка работоспособности LSTM сети');
-                
-                // Простой тест модели
-                try {
-                    const testInput = tf.tensor3d([Array(50).fill().map(() => Array(8).fill(0.5))]);
-                    const prediction = model.predict(testInput);
-                    const result = prediction.dataSync()[0];
-                    
-                    testInput.dispose();
-                    prediction.dispose();
-                    
-                    addLog('✅ Тест модели пройден', 'info', 
-                           `Модель работает корректно. Тестовый прогноз: ${(result*100).toFixed(2)}%`);
-                    showNotification('Тест модели пройден успешно', 'info');
-                } catch (error) {
-                    console.error('Тест модели не пройден:', error);
-                    addLog('❌ Тест модели не пройден', 'error', error.message);
-                    showNotification('Ошибка теста модели', 'error');
-                }
-            });
-            
-            // Кнопка экспорта лога
+            // Простая кнопка экспорта лога
             document.getElementById('exportLogBtn')?.addEventListener('click', () => {
                 const logEntries = document.querySelectorAll('.log-entry');
                 let logText = 'Лог решений нейросети-трейдера\n';
-                logText += 'Версия: LSTM Model v5\n';
                 logText += 'Дата: ' + new Date().toLocaleString() + '\n';
                 logText += '===============================\n\n';
                 
@@ -548,17 +454,17 @@ Features: Цена, Объем, RSI, SMA7, Изменение, Волатиль�
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 
-                addLog('Лог экспортирован в файл', 'info');
-                showNotification('Лог успешно экспортирован', 'info');
+                window.addLog('Лог экспортирован в файл', 'info');
+                window.showNotification('Лог успешно экспортирован', 'info');
             });
             
             console.log('Интерфейс инициализирован');
         });
         
-        // Отображение консольного лога для отладки
+        // Глобальная проверка загрузки библиотек
         console.log('=== Нейросеть-трейдер Pro ===');
-        console.log('TensorFlow.js:', typeof tf !== 'undefined' ? `загружен v${tf.version.tfjs}` : 'не загружен');
-        console.log('Chart.js:', typeof Chart !== 'undefined' ? 'загружен' : 'не загружен');
+        console.log('TensorFlow.js:', typeof tf !== 'undefined' ? `загружен v${tf.version.tfjs}` : 'НЕ ЗАГРУЖЕН!');
+        console.log('Chart.js:', typeof Chart !== 'undefined' ? 'загружен' : 'НЕ ЗАГРУЖЕН!');
         console.log('Готов к работе');
     </script>
 </body>
