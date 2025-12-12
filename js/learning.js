@@ -1,9 +1,14 @@
 // Система мониторинга обучения
 function updateLearningMetrics() {
+    console.log('Обновление метрик обучения...');
+    
     const predictions = state.predictions;
     const total = predictions.length;
     
-    if (total === 0) return;
+    if (total === 0) {
+        console.log('Нет прогнозов для анализа');
+        return;
+    }
     
     // Рассчитываем метрики
     const recent = predictions.slice(-50);
@@ -40,27 +45,37 @@ function updateLearningMetrics() {
     if (recentAccuracy > 70) understanding += 10;
     understanding = Math.min(understanding, 100);
     
-    // Эффективность
-    const efficiency = recentAccuracy;
-    
     // Обновляем UI
-    document.getElementById('learningStage').textContent = stageText;
-    document.getElementById('marketUnderstanding').textContent = understanding + '%';
-    document.getElementById('neuronEfficiency').textContent = recentAccuracy.toFixed(1) + '%';
-    document.getElementById('learningMemory').textContent = total + '/1000';
+    const learningStage = document.getElementById('learningStage');
+    const marketUnderstanding = document.getElementById('marketUnderstanding');
+    const neuronEfficiency = document.getElementById('neuronEfficiency');
+    const learningMemory = document.getElementById('learningMemory');
     
-    document.getElementById('learningProgress').style.width = (total / 1000 * 100) + '%';
-    document.getElementById('understandingProgress').style.width = understanding + '%';
-    document.getElementById('efficiencyProgress').style.width = recentAccuracy + '%';
-    document.getElementById('memoryProgress').style.width = (total / 1000 * 100) + '%';
+    if (learningStage) learningStage.textContent = stageText;
+    if (marketUnderstanding) marketUnderstanding.textContent = understanding + '%';
+    if (neuronEfficiency) neuronEfficiency.textContent = recentAccuracy.toFixed(1) + '%';
+    if (learningMemory) learningMemory.textContent = total + '/1000';
+    
+    // Обновляем прогресс-бары
+    const learningProgress = document.getElementById('learningProgress');
+    const understandingProgress = document.getElementById('understandingProgress');
+    const efficiencyProgress = document.getElementById('efficiencyProgress');
+    const memoryProgress = document.getElementById('memoryProgress');
+    
+    if (learningProgress) learningProgress.style.width = (total / 1000 * 100) + '%';
+    if (understandingProgress) understandingProgress.style.width = understanding + '%';
+    if (efficiencyProgress) efficiencyProgress.style.width = recentAccuracy + '%';
+    if (memoryProgress) memoryProgress.style.width = (total / 1000 * 100) + '%';
     
     state.learningMetrics = {
         stage: stage,
         understanding: understanding,
-        efficiency: efficiency,
+        efficiency: recentAccuracy,
         memoryUsed: total,
         patternsFound: Math.floor(total / 10)
     };
+    
+    console.log('Метрики обновлены:', state.learningMetrics);
 }
 
 function generateLearningReport() {
@@ -186,3 +201,8 @@ ${pred.result && pred.result.isCorrect ?
     '• Веса нейросети будут скорректированы для избежания подобных ошибок'}
 `;
 }
+
+// Экспортируем функции
+window.updateLearningMetrics = updateLearningMetrics;
+window.generateLearningReport = generateLearningReport;
+window.analyzeLastDecision = analyzeLastDecision;
