@@ -62,11 +62,39 @@ function evaluatePrediction(prediction, actualPrice) {
         accuracy
     });
 
-    // Логируем
-    const logMsg = `Прогноз: ${prediction.decision} (${(prediction.probability*100).toFixed(1)}%) | ` +
-                  `Цена: ${prediction.price.toFixed(2)} → ${actualPrice.toFixed(2)} | ` +
-                  `Результат: ${isCorrect ? '✅' : '❌'} | ` +
-                  `Баланс: ${state.balance.toFixed(2)} USDT`;
+    // Сохраняем уверенность
+    state.confidenceHistory.push({
+        time: Date.now(),
+        confidence: prediction.probability * 100,
+        isCorrect: isCorrect
+    });
 
-    addLog(logMsg, isCorrect ? 'profit' : 'loss');
+    // Логируем результат с анализом
+    const confidence = (prediction.probability * 100).toFixed(1);
+    const changePercent = (priceChange / prediction.price * 100).toFixed(2);
+
+    let analysis = "";
+    if (isCorrect && prediction.probability > 0.6) {
+        analysis = "✅ Нейросеть была уверена и оказалась права - отличное обучение!";
+    } else if (!isCorrect && prediction.probability > 0.7) {
+        analysis = "⚠️ Нейросеть была уверена, но ошиблась - важный урок для корректировки весов";
+    } else if (!isCorrect && prediction.probability < 0.5) {
+        analysis = "🎯 Нейросеть сомневалась и ошиблась - ожидаемый результат при обучении";
+    }
+
+    addLog(
+        `Результат: ${isCorrect ? '✅ ПРАВИЛЬНО' : '❌ ОШИБКА'} | ` +
+        `Цена: ${prediction.price.toFixed(2)} → ${actualPrice.toFixed(2)} | ` +
+        `Изменение: ${changePercent}% | ` +
+        `Уверенность: ${confidence}% | ` +
+        `Баланс: ${state.balance.toFixed(2)} USDT`,
+        isCorrect ? 'profit' : 'loss',
+        analysis
+    );
+
+    // Автоотчет каждые 50 прогнозов
+    if (state.predictions.length % 50 === 0) {
+        const report = generateLearningReport();
+        addLog("📊 АВТООТЧЕТ ОБУЧЕНИЯ", 'info', report);
+    }
 }
