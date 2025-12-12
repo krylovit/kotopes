@@ -1,37 +1,36 @@
 // Работа с данными Binance API
 async function fetchData(symbol, interval, limit = 100) {
-    console.log(`Fetching data: ${symbol}, ${interval}, ${limit}`);
+    console.log(`Загрузка данных: ${symbol}, ${interval}, ${limit}`);
     
     try {
-        // Используем прокси для избежания CORS ошибок
-        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-        const apiUrl = `${CONFIG.API_URL}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-        const url = proxyUrl + apiUrl;
+        // Используем публичный прокси для избежания CORS
+        // Binance API не требует ключа для публичных данных
+        const apiUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
         
-        console.log(`Fetching from: ${url}`);
+        console.log(`Запрашиваем: ${apiUrl}`);
         
-        const response = await fetch(url, {
+        // Используем простой fetch без прокси (бинанс поддерживает CORS)
+        const response = await fetch(apiUrl, {
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'Content-Type': 'application/json'
             }
         });
-        
-        console.log('Response status:', response.status);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const klines = await response.json();
-        console.log('Received klines:', klines.length);
+        console.log(`Получено свечей: ${klines.length}`);
         
-        // Проверяем, что данные есть
         if (!klines || klines.length === 0) {
-            console.log('No data received, generating test data');
+            console.log('Нет данных от API, генерируем тестовые данные');
             return generateTestData(limit);
         }
         
+        // Преобразуем данные в удобный формат
         return klines.map((k, index) => ({
             time: parseInt(k[0]),
             open: parseFloat(k[1]),
@@ -41,22 +40,21 @@ async function fetchData(symbol, interval, limit = 100) {
             volume: parseFloat(k[5]),
             closeTime: parseInt(k[6]),
             quoteVolume: parseFloat(k[7]),
-            trades: parseInt(k[8]),
-            takerBuyBaseVolume: parseFloat(k[9]),
-            takerBuyQuoteVolume: parseFloat(k[10])
+            trades: parseInt(k[8])
         }));
+        
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         addLog(`Ошибка загрузки: ${error.message}`, 'warning');
         
-        // Генерация тестовых данных при ошибке
-        console.log('Generating test data due to error');
+        // Генерируем тестовые данные при ошибке
+        console.log('Генерируем тестовые данные из-за ошибки');
         return generateTestData(limit);
     }
 }
 
 function generateTestData(count) {
-    console.log(`Generating ${count} test candles`);
+    console.log(`Генерация ${count} тестовых свечей`);
     
     const data = [];
     let price = 50000;
@@ -82,28 +80,22 @@ function generateTestData(count) {
             volume: volume,
             closeTime: now - (count - i - 1) * interval,
             quoteVolume: volume * price,
-            trades: Math.floor(Math.random() * 1000),
-            takerBuyBaseVolume: volume * 0.6,
-            takerBuyQuoteVolume: volume * price * 0.6
+            trades: Math.floor(Math.random() * 1000)
         });
     }
     
-    console.log('Generated test data:', data.length, 'candles');
+    console.log('Сгенерировано тестовых данных:', data.length, 'свечей');
     return data;
 }
 
 function evaluatePrediction(prediction, actualPrice) {
-    console.log('Evaluating prediction:', prediction, 'actual:', actualPrice);
-    
     if (!prediction || !prediction.decision) {
-        console.error('Invalid prediction object');
+        console.error('Некорректный объект предсказания');
         return;
     }
 
-    // Используем скорректированный размер ставки
-    const betSize = prediction.adjustedBetSize || 
-                   parseFloat(document.getElementById('betSize').value) || 
-                   CONFIG.DEFAULT_BET;
+    // Получаем размер ставки
+    const betSize = parseFloat(document.getElementById('betSize')?.value) || CONFIG.DEFAULT_BET;
     
     const priceChange = actualPrice - prediction.price;
     
@@ -111,25 +103,24 @@ function evaluatePrediction(prediction, actualPrice) {
     if (prediction.decision === 'BUY' && priceChange > 0) isCorrect = true;
     if (prediction.decision === 'SELL' && priceChange < 0) isCorrect = true;
     
-    console.log(`Decision: ${prediction.decision}, Price change: ${priceChange}, Correct: ${isCorrect}`);
+    console.log(`Решение: ${prediction.decision}, Изменение цены: ${priceChange.toFixed(2)}, Верно: ${isCorrect}`);
     
-    // Обновляем баланс
+    // Обновляем баланс (комиссия 5%)
     if (isCorrect) {
         state.balance += betSize * 0.95;
     } else {
         state.balance -= betSize;
     }
     
-    console.log('New balance:', state.balance);
+    console.log('Новый баланс:', state.balance);
     
     // Сохраняем результат
     prediction.result = {
-        actualPrice,
-        isCorrect,
+        actualPrice: actualPrice,
+        isCorrect: isCorrect,
         profit: isCorrect ? betSize * 0.95 : -betSize,
         time: Date.now(),
         betSize: betSize,
-        riskFactor: prediction.riskFactor || 1,
         priceChange: priceChange,
         priceChangePercent: (priceChange / prediction.price * 100).toFixed(2)
     };
@@ -147,7 +138,7 @@ function evaluatePrediction(prediction, actualPrice) {
     
     state.accuracyHistory.push({
         time: Date.now(),
-        accuracy
+        accuracy: accuracy
     });
     
     // Сохраняем уверенность
@@ -155,19 +146,19 @@ function evaluatePrediction(prediction, actualPrice) {
         time: Date.now(),
         confidence: prediction.probability * 100,
         isCorrect: isCorrect,
-        adjustedConfidence: prediction.adjustedConfidence * 100 || prediction.probability * 100,
         decision: prediction.decision
     });
     
     // Логируем результат
     logPredictionResult(prediction, actualPrice, isCorrect, betSize);
     
-    // Автоотчет каждые 10 прогнозов
-    if (state.predictions.length % 10 === 0 && state.predictions.length > 0) {
-        generateAutoReport();
+    // Анализируем рыночные условия и сохраняем опыт
+    const marketContext = analyzeMarketContext ? analyzeMarketContext() : {};
+    if (window.saveExperience) {
+        window.saveExperience(prediction, prediction.result, marketContext);
     }
     
-    // Ограничиваем размер массивов
+    // Ограничиваем размер массивов для производительности
     if (state.predictions.length > 1000) {
         state.predictions = state.predictions.slice(-500);
     }
@@ -187,10 +178,6 @@ function logPredictionResult(prediction, actualPrice, isCorrect, betSize) {
     let analysis = '';
     if (prediction.experienceBased) {
         analysis += '📚 На основе опыта | ';
-    }
-    
-    if (prediction.riskFactor && prediction.riskFactor !== 1) {
-        analysis += `⚖️ Ставка ×${prediction.riskFactor.toFixed(2)} | `;
     }
     
     addLog(
@@ -223,3 +210,8 @@ function generateAutoReport() {
     
     addLog('📊 Автоотчет', 'info', report);
 }
+
+// Экспортируем функции
+window.fetchData = fetchData;
+window.evaluatePrediction = evaluatePrediction;
+window.generateAutoReport = generateAutoReport;
