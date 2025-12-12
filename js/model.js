@@ -55,9 +55,10 @@ const STRATEGY = {
     }
 };
 
-// Работа с LSTM моделью
+// Глобальная переменная модели
 let model = null;
 
+// Работа с LSTM моделью
 async function createModel() {
     showLoader(true, 'Создание LSTM модели...');
 
@@ -464,6 +465,40 @@ function analyzeForPatterns(experience) {
     }
 }
 
+// Загрузка опыта
+function loadExperience() {
+    console.log('Loading experience...');
+    try {
+        const saved = localStorage.getItem(EXPERIENCE.STORAGE_KEY);
+        if (saved) {
+            experienceDB = JSON.parse(saved);
+            addLog(`📂 Загружена память обучения: ${experienceDB.decisions.length} решений, ${experienceDB.patterns.length} паттернов`, 'info');
+            visualizeExperienceUsage();
+        } else {
+            console.log('No experience data found in localStorage');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки опыта:', error);
+        experienceDB = {
+            patterns: [],
+            marketConditions: [],
+            decisions: [],
+            learnedRules: [],
+            statistics: {
+                totalDecisions: 0,
+                successfulBuys: 0,
+                failedBuys: 0,
+                successfulSells: 0,
+                failedSells: 0,
+                accuracyByMarketCondition: {},
+                bestParameters: {}
+            },
+            memoryUsage: 0,
+            lastAnalysis: null
+        };
+    }
+}
+
 // Визуализация использования опыта
 function visualizeExperienceUsage() {
     const experiencePanel = document.getElementById('experiencePanel');
@@ -515,37 +550,6 @@ function visualizeExperienceUsage() {
             Заполнение памяти: ${total}/${EXPERIENCE.MAX_MEMORY} записей
         </div>
     `;
-}
-
-// Загрузка опыта
-function loadExperience() {
-    try {
-        const saved = localStorage.getItem(EXPERIENCE.STORAGE_KEY);
-        if (saved) {
-            experienceDB = JSON.parse(saved);
-            addLog(`📂 Загружена память обучения: ${experienceDB.decisions.length} решений, ${experienceDB.patterns.length} паттернов`, 'info');
-            visualizeExperienceUsage();
-        }
-    } catch (error) {
-        console.error('Ошибка загрузки опыта:', error);
-        experienceDB = {
-            patterns: [],
-            marketConditions: [],
-            decisions: [],
-            learnedRules: [],
-            statistics: {
-                totalDecisions: 0,
-                successfulBuys: 0,
-                failedBuys: 0,
-                successfulSells: 0,
-                failedSells: 0,
-                accuracyByMarketCondition: {},
-                bestParameters: {}
-            },
-            memoryUsage: 0,
-            lastAnalysis: null
-        };
-    }
 }
 
 // Сохранение опыта
@@ -659,6 +663,8 @@ async function loadModel() {
         if (models['localstorage://neuro-trader-model-v5']) {
             model = await tf.loadLayersModel('localstorage://neuro-trader-model-v5');
             addLog('Модель загружена из памяти', 'info', 'Нейросеть вспомнила предыдущее обучение');
+        } else {
+            console.log('No saved model found');
         }
         
         const saved = localStorage.getItem(CONFIG.MODEL_KEY);
@@ -683,4 +689,46 @@ async function loadModel() {
     } finally {
         showLoader(false);
     }
+}
+
+// Функция для обновления списка паттернов (используется в app.js)
+function updatePatternsList() {
+    const patternsList = document.getElementById('patternsList');
+    if (!patternsList) return;
+
+    if (experienceDB.patterns.length === 0) {
+        patternsList.innerHTML = `
+            <div style="text-align: center; padding: 15px; color: #94a3b8;">
+                Паттерны будут появляться по мере обучения...
+            </div>
+        `;
+        return;
+    }
+
+    const recentPatterns = experienceDB.patterns
+        .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
+        .slice(0, 5);
+
+    let html = '';
+    recentPatterns.forEach(pattern => {
+        const typeIcon = pattern.decision === 'BUY' ? '🟢' : '🔴';
+        const successRate = (pattern.successRate * 100).toFixed(1);
+        const occurrences = pattern.occurrences;
+        
+        html += `
+            <div style="padding: 8px 12px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="font-size: 14px;">${typeIcon} ${pattern.decision}</span>
+                    <div style="font-size: 11px; color: #94a3b8;">
+                        Успешность: ${successRate}% (${occurrences} раз)
+                    </div>
+                </div>
+                <div style="font-size: 10px; color: #64748b;">
+                    ${new Date(pattern.lastSeen).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                </div>
+            </div>
+        `;
+    });
+
+    patternsList.innerHTML = html;
 }
