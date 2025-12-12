@@ -513,3 +513,41 @@ body {
     background: #2563eb;
     transform: scale(1.1);
 }
+
+/* Вкладки */
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: #1e293b;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.tab {
+    background: #334155;
+    border: none;
+    color: #e2e8f0;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    background: #475569;
+}
+
+.tab.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
