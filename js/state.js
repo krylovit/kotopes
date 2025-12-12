@@ -8,7 +8,15 @@ let state = {
     priceData: [],
     balanceHistory: [{time: Date.now(), balance: CONFIG.INITIAL_BALANCE}],
     accuracyHistory: [],
+    confidenceHistory: [],
     sessionStart: null,
     indicators: {},
-    lastPrediction: null
+    lastPrediction: null,
+    learningMetrics: {
+        stage: 'data_gathering',
+        understanding: 0,
+        efficiency: 0,
+        memoryUsed: 0,
+        patternsFound: 0
+    }
 };
