@@ -47,18 +47,16 @@ async function mainLoop() {
                         evaluatePrediction(prediction, actualPrice);
                         updateCharts();
                         updateUI();
+                        updateLearningMetrics();
                     }
                 }, 5000);
             }
         }
 
-        // Обновляем графики
         updateCharts();
-
-        // Обновляем UI
         updateUI();
+        updateLearningMetrics();
 
-        // Следующий цикл
         setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
 
     } catch (error) {
@@ -78,7 +76,6 @@ function initEventHandlers() {
             if (!model) return;
         }
 
-        // Загружаем начальные данные
         const symbol = document.getElementById('symbolSelect').value;
         const interval = document.getElementById('timeframeSelect').value;
         const data = await fetchData(symbol, interval, 100);
@@ -91,7 +88,8 @@ function initEventHandlers() {
             document.getElementById('startBtn').disabled = true;
             document.getElementById('pauseBtn').disabled = false;
 
-            addLog('Обучение начато', 'info');
+            addLog('Обучение начато', 'info', 
+                   'Нейросеть начала анализировать рынок и учиться на своих решениях');
             showNotification('Нейросеть начала обучение', 'info');
 
             mainLoop();
@@ -103,13 +101,26 @@ function initEventHandlers() {
         if (state.status === 'running') {
             state.status = 'paused';
             document.getElementById('pauseBtn').textContent = '▶ Продолжить';
-            addLog('Обучение приостановлено', 'warning');
+            addLog('Обучение приостановлено', 'warning', 
+                   'Нейросеть остановила обучение, но помнит всё что выучила');
         } else if (state.status === 'paused') {
             state.status = 'running';
             document.getElementById('pauseBtn').textContent = '⏸ Пауза';
             addLog('Обучение продолжено', 'info');
             mainLoop();
         }
+    });
+
+    // Анализ последнего решения
+    document.getElementById('analyzeDecisionBtn').addEventListener('click', () => {
+        const analysis = analyzeLastDecision();
+        addLog('🔍 Анализ последнего решения нейросети', 'debug', analysis);
+    });
+
+    // Отчет обучения
+    document.getElementById('learningReportBtn').addEventListener('click', () => {
+        const report = generateLearningReport();
+        addLog('📊 Полный отчет об обучении нейросети', 'info', report);
     });
 
     // Сохранить
@@ -120,7 +131,7 @@ function initEventHandlers() {
 
     // Сброс
     document.getElementById('resetBtn').addEventListener('click', () => {
-        if (confirm('Сбросить модель и все данные?')) {
+        if (confirm('Сбросить модель и все данные? Вся память обучения будет потеряна.')) {
             model = null;
             state = {
                 status: 'stopped',
@@ -129,9 +140,17 @@ function initEventHandlers() {
                 priceData: [],
                 balanceHistory: [{time: Date.now(), balance: CONFIG.INITIAL_BALANCE}],
                 accuracyHistory: [],
+                confidenceHistory: [],
                 sessionStart: null,
                 indicators: {},
-                lastPrediction: null
+                lastPrediction: null,
+                learningMetrics: {
+                    stage: 'data_gathering',
+                    understanding: 0,
+                    efficiency: 0,
+                    memoryUsed: 0,
+                    patternsFound: 0
+                }
             };
 
             document.getElementById('startBtn').disabled = false;
@@ -141,8 +160,10 @@ function initEventHandlers() {
             updateUI();
             updateCharts();
             updateIndicatorsTable();
+            updateLearningMetrics();
 
-            addLog('Система сброшена', 'warning');
+            addLog('Система сброшена', 'warning', 
+                   'Нейросеть забыла всё обучение. Начинаем с чистого листа.');
             showNotification('Система сброшена', 'info');
         }
     });
@@ -151,18 +172,6 @@ function initEventHandlers() {
     document.getElementById('clearLogBtn').addEventListener('click', () => {
         document.getElementById('logContent').innerHTML = '';
         addLog('Лог очищен', 'info');
-    });
-
-    // Вкладки
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-            tab.classList.add('active');
-            const tabId = tab.getAttribute('data-tab');
-            document.getElementById(`${tabId}-tab`).classList.add('active');
-        });
     });
 
     // Прокрутка вверх
@@ -178,8 +187,9 @@ function initEventHandlers() {
 
 // Инициализация
 async function init() {
-    console.log('Инициализация системы...');
-    addLog('Система инициализируется', 'info');
+    console.log('Инициализация системы мониторинга обучения...');
+    addLog('Инициализация системы...', 'info', 
+           'Система мониторинга обучения нейросети активирована');
 
     showLoader(true, 'Инициализация...');
 
@@ -193,9 +203,14 @@ async function init() {
 
         updateUI();
         updateIndicatorsTable();
+        updateLearningMetrics();
 
-        addLog('Система готова к работе', 'info');
-        showNotification('Нейросеть-трейдер готова', 'info');
+        addLog('Система готова к работе', 'info', 
+               '1. Нажмите "Старт обучения" чтобы начать\n' +
+               '2. Смотрите "Мониторинг обучения" для понимания процесса\n' +
+               '3. Используйте кнопки анализа для глубокого понимания');
+
+        showNotification('Нейросеть-трейдер готова с мониторингом обучения', 'info');
 
     } catch (error) {
         console.error('Ошибка инициализации:', error);
@@ -205,5 +220,4 @@ async function init() {
     }
 }
 
-// Запуск при загрузке страницы
 window.addEventListener('DOMContentLoaded', init);
