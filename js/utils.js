@@ -1,6 +1,11 @@
 // Утилиты
 function showNotification(message, type = 'info', duration = 3000) {
     const notification = document.getElementById('notification');
+    if (!notification) {
+        console.log('Уведомление:', message, type);
+        return;
+    }
+    
     notification.textContent = message;
     notification.className = `notification ${type}`;
     notification.classList.add('show');
@@ -12,6 +17,8 @@ function showLoader(show, text = 'Загрузка...') {
     const loader = document.getElementById('loader');
     const loaderText = document.getElementById('loaderText');
 
+    if (!loader || !loaderText) return;
+
     if (show) {
         loaderText.textContent = text;
         loader.classList.add('active');
@@ -22,6 +29,11 @@ function showLoader(show, text = 'Загрузка...') {
 
 function addLog(message, type = 'info', details = null) {
     const logContent = document.getElementById('logContent');
+    if (!logContent) {
+        console.log(`[${type}] ${message}: ${details}`);
+        return;
+    }
+    
     const time = new Date().toLocaleTimeString();
 
     const entry = document.createElement('div');
@@ -47,3 +59,8 @@ function addLog(message, type = 'info', details = null) {
     // Автопрокрутка
     logContent.scrollTop = 0;
 }
+
+// Экспортируем функции для глобального использования
+window.showNotification = showNotification;
+window.showLoader = showLoader;
+window.addLog = addLog;
