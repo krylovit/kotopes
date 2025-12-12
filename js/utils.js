@@ -20,15 +20,21 @@ function showLoader(show, text = 'Загрузка...') {
     }
 }
 
-function addLog(message, type = 'info') {
+function addLog(message, type = 'info', details = null) {
     const logContent = document.getElementById('logContent');
     const time = new Date().toLocaleTimeString();
 
     const entry = document.createElement('div');
     entry.className = 'log-entry';
+    
+    let messageHTML = message;
+    if (details) {
+        messageHTML += `<div style="margin-top: 5px; padding-left: 10px; border-left: 2px solid #475569; color: #94a3b8; font-size: 11px;">${details}</div>`;
+    }
+
     entry.innerHTML = `
         <div class="log-time">${time}</div>
-        <div class="log-message log-${type}">${message}</div>
+        <div class="log-message log-${type}">${messageHTML}</div>
     `;
 
     logContent.prepend(entry);
