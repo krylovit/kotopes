@@ -25,6 +25,15 @@ function updateUI() {
     const accuracy = recent.length > 0 ? (correct / recent.length) * 100 : 0;
     document.getElementById('accuracyValue').textContent = accuracy.toFixed(1) + '%';
 
+    const errors = state.predictions.filter(p => p.result && !p.result.isCorrect).length;
+    document.getElementById('errorsCount').textContent = errors;
+
+    // Уверенность
+    if (state.lastPrediction) {
+        document.getElementById('confidenceValue').textContent = 
+            (state.lastPrediction.probability * 100).toFixed(1) + '%';
+    }
+
     // Таймер сессии
     if (state.sessionStart) {
         const elapsed = Date.now() - state.sessionStart;
