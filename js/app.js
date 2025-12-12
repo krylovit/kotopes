@@ -43,7 +43,9 @@ async function mainLoop() {
         updateIndicatorsTable();
 
         // Обновляем список паттернов
-        updatePatternsList();
+        if (typeof updatePatternsList === 'function') {
+            updatePatternsList();
+        }
 
         // Делаем прогноз
         if (state.priceData.length >= CONFIG.LOOKBACK) {
@@ -87,6 +89,158 @@ async function mainLoop() {
         addLog('Ошибка в основном цикле: ' + error.message, 'warning');
         setTimeout(mainLoop, CONFIG.UPDATE_INTERVAL);
     }
+}
+
+// Генерация отчета обучения
+function generateLearningReport() {
+    const predictions = state.predictions;
+    const total = predictions.length;
+
+    if (total === 0) {
+        return "Нейросеть еще не сделала ни одного прогноза.";
+    }
+
+    const recent = predictions.slice(-20);
+    const recentAccuracy = recent.filter(p => p.result?.isCorrect).length / recent.length * 100;
+    const totalAccuracy = predictions.filter(p => p.result?.isCorrect).length / total * 100;
+
+    const buyPredictions = predictions.filter(p => p.decision === 'BUY');
+    const sellPredictions = predictions.filter(p => p.decision === 'SELL');
+    const buyAccuracy = buyPredictions.filter(p => p.result?.isCorrect).length / buyPredictions.length * 100 || 0;
+    const sellAccuracy = sellPredictions.filter(p => p.result?.isCorrect).length / sellPredictions.length * 100 || 0;
+
+    const confidenceCorrect = recent
+        .filter(p => p.result?.isCorrect)
+        .reduce((sum, p) => sum + p.probability, 0) / recent.filter(p => p.result?.isCorrect).length || 0;
+
+    const confidenceWrong = recent
+        .filter(p => p.result && !p.result.isCorrect)
+        .reduce((sum, p) => sum + p.probability, 0) / recent.filter(p => p.result && !p.result.isCorrect).length || 0;
+
+    const patternsFound = experienceDB.patterns.length;
+    const memoryUsed = experienceDB.memoryUsage > 0 ? ((experienceDB.memoryUsage / 1024).toFixed(1) + 'KB') : '0KB';
+
+    let analysis = "";
+
+    if (recentAccuracy > 60) {
+        analysis = "✅ Нейросеть эффективно обучается и выявляет рыночные закономерности";
+    } else if (recentAccuracy > 55) {
+        analysis = "⚠️ Нейросеть учится, но нужны дополнительные данные для стабильности";
+    } else if (recentAccuracy > 50) {
+        analysis = "🔍 Нейросеть находится в процессе обучения, точность чуть выше случайной";
+    } else {
+        analysis = "🎯 Нейросеть изучает рынок, пока не выявила четких закономерностей";
+    }
+
+    if (Math.abs(buyAccuracy - sellAccuracy) > 20) {
+        analysis += "\n📊 Нейросеть лучше работает с " + (buyAccuracy > sellAccuracy ? "BUY" : "SELL") + " сигналами";
+    }
+
+    if (confidenceCorrect > 0.7 && confidenceWrong < 0.5) {
+        analysis += "\n🧠 Нейросеть уверена в правильных решениях и сомневается в ошибках - хороший признак";
+    }
+
+    const report = `
+🧠 ПОЛНЫЙ ОТЧЕТ ОБ ОБУЧЕНИИ
+==============================
+
+📊 ОСНОВНЫЕ МЕТРИКИ:
+• Всего прогнозов: ${total}
+• Точность (все время): ${totalAccuracy.toFixed(1)}%
+• Точность (последние 20): ${recentAccuracy.toFixed(1)}%
+• Баланс: ${state.balance.toFixed(2)} USDT
+• Прибыль/убыток: ${(state.balance - CONFIG.INITIAL_BALANCE).toFixed(2)} USDT
+
+🎯 ДЕТАЛЬНАЯ СТАТИСТИКА:
+• Точность BUY: ${buyAccuracy.toFixed(1)}% (прогнозов: ${buyPredictions.length})
+• Точность SELL: ${sellAccuracy.toFixed(1)}% (прогнозов: ${sellPredictions.length})
+• Средняя уверенность (правильные): ${(confidenceCorrect * 100).toFixed(1)}%
+• Средняя уверенность (ошибки): ${(confidenceWrong * 100).toFixed(1)}%
+
+🧠 ПАМЯТЬ ОБУЧЕНИЯ:
+• Паттернов найдено: ${patternsFound}
+• Использовано памяти: ${memoryUsed}
+• Решений в памяти: ${experienceDB.decisions.length}
+
+🔍 АНАЛИЗ ОБУЧЕНИЯ:
+${analysis}
+
+📈 СТАТУС: ${state.learningMetrics.stage === 'pattern_recognition' ? 'РАСПОЗНАВАНИЕ ПАТТЕРНОВ' : 'АКТИВНОЕ ОБУЧЕНИЕ'}
+`;
+
+    return report;
+}
+
+// Анализ последнего решения
+function analyzeLastDecision() {
+    if (!state.lastPrediction) {
+        return "Нет данных о последнем решении";
+    }
+
+    const pred = state.lastPrediction;
+    const confidence = (pred.probability * 100).toFixed(1);
+
+    let analysis = "";
+
+    if (pred.probability > 0.7) {
+        analysis = "🧠 Нейросеть ВЫСОКО уверена в этом решении";
+    } else if (pred.probability > 0.6) {
+        analysis = "🤔 Нейросеть умеренно уверена";
+    } else {
+        analysis = "🎯 Нейросеть НЕУВЕРЕННА, решение на грани";
+    }
+
+    if (pred.experienceBased) {
+        analysis += "\n📚 Решение основано на предыдущем успешном опыте";
+    }
+
+    if (pred.forced) {
+        analysis += "\n⚠️ Это было ПРИНУДИТЕЛЬНОЕ решение пользователя";
+    }
+
+    if (pred.result) {
+        analysis += pred.result.isCorrect ? 
+            "\n✅ Прогноз был ПРАВИЛЬНЫМ - нейросеть запомнит этот успех" :
+            "\n❌ Прогноз был ОШИБОЧНЫМ - нейросеть скорректирует веса";
+    }
+
+    const marketContext = analyzeMarketContext();
+    const marketAnalysis = `
+Текущие рыночные условия:
+• Тренд: ${marketContext.trend}
+• Волатильность: ${marketContext.volatility}
+• RSI: ${marketContext.rsiExtreme}
+• Объем: ${marketContext.volume}
+    `;
+
+    return `
+🔍 ДЕТАЛЬНЫЙ АНАЛИЗ ПОСЛЕДНЕГО РЕШЕНИЯ
+======================================
+
+📊 РЕШЕНИЕ:
+• Тип: ${pred.decision} ${pred.forced ? '(ПРИНУДИТЕЛЬНО)' : ''}
+• Уверенность: ${confidence}%
+• Цена в момент решения: ${pred.price.toFixed(2)}
+${pred.result ? `• Реальная цена: ${pred.result.actualPrice.toFixed(2)}` : ''}
+${pred.result ? `• Изменение: ${pred.result.priceChangePercent}%` : ''}
+${pred.result ? `• Результат: ${pred.result.isCorrect ? '✅ ПРАВИЛЬНО' : '❌ ОШИБКА'}` : ''}
+
+🤔 КАК ПРИНИМАЛОСЬ РЕШЕНИЕ:
+1. Проанализировано ${CONFIG.LOOKBACK} свечей
+2. Уверенность модели: ${confidence}%
+3. Балансировка классов: ${pred.classBalanceCorrection ? 'применена' : 'не применялась'}
+4. Коррекция по рынку: ${pred.marketAdjustment ? pred.marketAdjustment.toFixed(3) : '0'}
+5. Порог принятия: ${pred.dynamicThreshold ? pred.dynamicThreshold.toFixed(3) : '0.5'}
+
+${marketAnalysis}
+
+${analysis}
+
+💡 ВЛИЯНИЕ НА ОБУЧЕНИЕ:
+${pred.result && pred.result.isCorrect ? 
+    '• Усиливаем веса для подобных ситуаций' :
+    '• Ослабляем веса, корректируем стратегию'}
+`;
 }
 
 // Обработчики событий
@@ -198,12 +352,6 @@ function initEventHandlers() {
             return;
         }
         
-        state.forcedDecision = {
-            decision: 'SELL',
-            reason: 'Принудительное решение пользователя',
-            time: Date.now()
-        };
-        
         const currentPrice = state.priceData[state.priceData.length - 1].close;
         const forcedPrediction = {
             time: Date.now(),
@@ -220,6 +368,20 @@ function initEventHandlers() {
         addLog('Пользователь принудительно установил SELL', 'warning',
                `Цена: ${currentPrice.toFixed(2)} | Это решение будет проверено на следующей свече`);
         showNotification('Принудительный SELL установлен', 'info');
+        
+        // Ждем следующую свечу для проверки
+        setTimeout(async () => {
+            const symbol = document.getElementById('symbolSelect').value;
+            const interval = document.getElementById('timeframeSelect').value;
+            const checkData = await fetchData(symbol, interval, 1);
+            if (checkData && checkData.length > 0) {
+                const actualPrice = checkData[0].close;
+                evaluatePrediction(forcedPrediction, actualPrice);
+                updateCharts();
+                updateUI();
+                updateLearningMetrics();
+            }
+        }, 5000);
     });
 
     // Принудительный BUY
@@ -235,12 +397,6 @@ function initEventHandlers() {
             showNotification('Нет данных для принятия решения', 'warning');
             return;
         }
-        
-        state.forcedDecision = {
-            decision: 'BUY',
-            reason: 'Принудительное решение пользователя',
-            time: Date.now()
-        };
         
         const currentPrice = state.priceData[state.priceData.length - 1].close;
         const forcedPrediction = {
@@ -258,6 +414,20 @@ function initEventHandlers() {
         addLog('Пользователь принудительно установил BUY', 'warning',
                `Цена: ${currentPrice.toFixed(2)} | Это решение будет проверено на следующей свече`);
         showNotification('Принудительный BUY установлен', 'info');
+        
+        // Ждем следующую свечу для проверки
+        setTimeout(async () => {
+            const symbol = document.getElementById('symbolSelect').value;
+            const interval = document.getElementById('timeframeSelect').value;
+            const checkData = await fetchData(symbol, interval, 1);
+            if (checkData && checkData.length > 0) {
+                const actualPrice = checkData[0].close;
+                evaluatePrediction(forcedPrediction, actualPrice);
+                updateCharts();
+                updateUI();
+                updateLearningMetrics();
+            }
+        }, 5000);
     });
 
     // Сохранить
@@ -289,8 +459,7 @@ function initEventHandlers() {
                     efficiency: 0,
                     memoryUsed: 0,
                     patternsFound: 0
-                },
-                forcedDecision: null
+                }
             };
 
             // Сброс опыта
@@ -323,7 +492,9 @@ function initEventHandlers() {
             updateIndicatorsTable();
             updateLearningMetrics();
             visualizeExperienceUsage();
-            updatePatternsList();
+            if (typeof updatePatternsList === 'function') {
+                updatePatternsList();
+            }
 
             addLog('Система полностью сброшена', 'warning', 
                    'Нейросеть забыла всё обучение. Начинаем с чистого листа.');
@@ -379,7 +550,11 @@ async function init() {
         console.log('TensorFlow.js loaded:', tf.version.tfjs);
 
         // Загружаем опыт
-        loadExperience();
+        if (typeof loadExperience === 'function') {
+            loadExperience();
+        } else {
+            console.error('loadExperience function not found!');
+        }
 
         // Инициализируем обработчики
         initEventHandlers();
@@ -395,8 +570,14 @@ async function init() {
         updateUI();
         updateIndicatorsTable();
         updateLearningMetrics();
-        visualizeExperienceUsage();
-        updatePatternsList();
+        
+        if (typeof visualizeExperienceUsage === 'function') {
+            visualizeExperienceUsage();
+        }
+        
+        if (typeof updatePatternsList === 'function') {
+            updatePatternsList();
+        }
 
         addLog('Система успешно инициализирована', 'info', 
                '1. Нажмите "Старт обучения" чтобы начать\n' +
